@@ -1,61 +1,82 @@
 "use client";
 
+import { useMemo } from "react";
 import { api } from "~/trpc/react";
-import { type RouterOutputs } from "~/trpc/react";
 import { DataTable } from "~/_components/data-table";
-import { type ColumnDef } from "@tanstack/react-table";
-import { Button } from "~/components/ui/button";
-import { Plus, Upload } from "lucide-react";
-import Link from "next/link";
-
-type Peserta = RouterOutputs["peserta"]["getAll"][number];
-
-const columns: ColumnDef<Peserta>[] = [
-  { accessorKey: "nipd", header: "NIPD" },
-  { accessorKey: "namaLengkap", header: "Nama Lengkap" },
-  {
-    accessorKey: "kelas.jenjang",
-    header: "Jenjang",
-    cell: ({ row }) => row.original.kelas.jenjang,
-  },
-  {
-    accessorKey: "kelas.tingkat",
-    header: "Kelas",
-    cell: ({ row }) =>
-      `${row.original.kelas.tingkat} ${row.original.kelas.namaKelas}`,
-  },
-  {
-    accessorKey: "status",
-    header: "Status",
-    cell: ({ row }) => (
-      <span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold">
-        {row.original.status}
-      </span>
-    ),
-  },
-];
+import { getPesertaColumns } from "./columns";
+import { PesertaTableActions } from "./peserta-table-actions";
 
 export function PesertaTable() {
-  const { data = [], isLoading } = api.peserta.getAll.useQuery();
+  const utils = api.useUtils();
+
+  // Ambil data utama dari server
+  const { data: daftarPeserta = [], isLoading } = api.peserta.getAll.useQuery();
+  const { data: daftarWali = [], isLoading: loadWali } =
+    api.peserta.getWaliAsuh.useQuery();
+
+  // Mutasi untuk mengaitkan wali asuh langsung dari tabel
+  const assignWaliMutation = api.peserta.assignWaliAsuh.useMutation({
+    onSuccess: () => utils.peserta.getAll.invalidate(),
+    onError: (error) => alert("Gagal menugaskan Wali Asuh: " + error.message),
+  });
+
+  const deletePesertaMutation = api.peserta.deletePeserta.useMutation({
+    onSuccess: () => utils.peserta.getAll.invalidate(),
+    onError: (error) => alert("Gagal menghapus data: " + error.message),
+  });
+
+  const handleAssignWali = (pesertaId: string, waliAsuhId: string | null) => {
+    if (waliAsuhId) {
+      const finalId = waliAsuhId === "unassigned" ? null : waliAsuhId;
+      assignWaliMutation.mutate({ pesertaId, waliAsuhId: finalId });
+    }
+  };
+
+  const handleDelete = (id: string) => {
+    if (
+      confirm(
+        "Yakin ingin menghapus data peserta didik ini? Tindakan ini tidak dapat dibatalkan.",
+      )
+    ) {
+      deletePesertaMutation.mutate({ id });
+    }
+  };
+
+  // Memoize konfigurasi kolom agar tidak ter-render ulang kecuali data wali / status mutasi berubah
+  const columns = useMemo(
+    () =>
+      getPesertaColumns({
+        daftarWali,
+        loadWali,
+        isAssigningWali: assignWaliMutation.isPending,
+        onAssignWali: handleAssignWali,
+        onDelete: handleDelete,
+      }),
+    [daftarWali, loadWali, assignWaliMutation.isPending],
+  );
 
   return (
     <div className="mt-4 space-y-4">
-      <div className="flex justify-end gap-2">
-        <Button variant="outline">
-          <Upload className="mr-2 h-4 w-4" />
-          Import Excel
-        </Button>
-        <Button
-          render={
-            <Link href="/dashboard/peserta/tambah">
-              <Plus className="mr-2 h-4 w-4" />
-              Tambah Peserta
-            </Link>
-          }
-          nativeButton={false}
-        />
-      </div>
-      <DataTable columns={columns} data={data} isLoading={isLoading} />
+      {/* Render komponen tombol-tombol dan Modal Import Excel */}
+      <PesertaTableActions />
+
+      {/* Render komponen tabel dengan kolom yang bisa di-toggle */}
+      <DataTable
+        columns={columns}
+        data={daftarPeserta}
+        isLoading={isLoading}
+        initialColumnVisibility={{
+          status: false,
+          nisn: false,
+          tempatLahir: false,
+          tanggalLahir: false,
+          agama: false,
+          alamat: false,
+          noTelp: false,
+          namaIbu: false,
+          namaAyah: false,
+        }}
+      />
     </div>
   );
 }
