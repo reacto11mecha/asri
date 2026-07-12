@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { toast } from "sonner";
 import { api } from "~/trpc/react";
 import { ArrowLeft, Loader2, Save } from "lucide-react";
 import Link from "next/link";
@@ -133,9 +134,12 @@ export default function TambahPesertaPage() {
       await utils.peserta.getAll.invalidate();
 
       router.push("/dashboard/peserta");
-      router.refresh();
+      toast.success("Berhasil menambahkan peserta!");
     },
-    onError: (error) => alert("Gagal menyimpan data: " + error.message),
+    onError: (error) =>
+      toast.error("Gagal menambahkan peserta", {
+        description: error.message,
+      }),
   });
 
   const form = useForm<z.infer<typeof formSchema>>({

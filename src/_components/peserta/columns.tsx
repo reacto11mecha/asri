@@ -77,13 +77,20 @@ export const getPesertaColumns = ({
       );
     },
   },
-  { accessorKey: "nipd", header: "NIPD" },
+  {
+    accessorKey: "nipd",
+    header: "NIPD",
+    cell: ({ row }) => <span className="font-mono">{row.original.nipd}</span>,
+  },
   { accessorKey: "namaLengkap", header: "Nama Lengkap" },
   {
     accessorKey: "kelas",
     header: "Kelas",
-    cell: ({ row }) =>
-      `${row.original.kelas.jenjang} - ${row.original.kelas.tingkat} ${row.original.kelas.namaKelas}`,
+    cell: ({ row }) => (
+      <span className="font-mono">
+        {`${row.original.kelas.jenjang} | ${row.original.kelas.tingkat} | ${row.original.kelas.namaKelas}`}
+      </span>
+    ),
   },
   {
     id: "waliAsuh",

@@ -16,20 +16,17 @@ export default function ManajemenAkademikPage() {
       </div>
 
       {/* Tabs Container */}
-      <Tabs defaultValue="peserta" className="w-full">
-        {/* Tombol Tab */}
-        <TabsList className="grid w-full max-w-[400px] grid-cols-2">
+      <Tabs defaultValue="peserta" className="flex h-full w-full flex-col">
+        <TabsList className="grid w-full max-w-100 grid-cols-2">
           <TabsTrigger value="peserta">Data Peserta</TabsTrigger>
           <TabsTrigger value="kelas">Data Kelas</TabsTrigger>
         </TabsList>
 
-        {/* Konten Tab Peserta */}
-        <TabsContent value="peserta">
+        {/* Tambahkan h-full dan overflow-hidden agar konten tidak meluap */}
+        <TabsContent value="peserta" className="h-full overflow-hidden">
           <PesertaTable />
         </TabsContent>
-
-        {/* Konten Tab Kelas */}
-        <TabsContent value="kelas">
+        <TabsContent value="kelas" className="h-full overflow-hidden">
           <KelasTable />
         </TabsContent>
       </Tabs>

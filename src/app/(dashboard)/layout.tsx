@@ -21,7 +21,7 @@ export default async function DashboardLayout({
   if (!auth) redirect("/login");
 
   return (
-    <div className="bg-background flex h-screen overflow-hidden">
+    <div className="bg-background flex min-h-screen w-full">
       {/* SIDEBAR DESKTOP (Sembunyi di layar kecil) */}
       <aside className="bg-muted/20 hidden w-64 flex-col border-r md:flex">
         <Sidebar />

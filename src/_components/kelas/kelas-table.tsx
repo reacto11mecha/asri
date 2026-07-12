@@ -5,7 +5,8 @@ import { api } from "~/trpc/react";
 import { type RouterOutputs } from "~/trpc/react";
 import { DataTable } from "~/_components/data-table";
 import { type ColumnDef } from "@tanstack/react-table";
-import { Plus, Loader2, MoreHorizontal, Edit, Trash2 } from "lucide-react"; // Tambahan Ikon
+import { Plus, Loader2, MoreHorizontal, Edit, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -56,23 +57,30 @@ export function KelasTable() {
   const createKelasMutation = api.peserta.createKelas.useMutation({
     onSuccess: () => {
       closeDialog();
-      utils.peserta.getAllKelas.invalidate();
+      void utils.peserta.getAllKelas.invalidate();
+      toast.success("Berhasil membuat kelas!");
     },
-    onError: (error) => alert("Gagal menambahkan kelas: " + error.message),
+    onError: (error) =>
+      toast.error("Gagal membuat kelas", { description: error.message }),
   });
 
   const updateKelasMutation = api.peserta.updateKelas.useMutation({
     onSuccess: () => {
       closeDialog();
       utils.peserta.getAllKelas.invalidate();
+      toast.success("Berhasil mengupdate kelas!");
     },
-    onError: (error) => alert("Gagal mengupdate kelas: " + error.message),
+    onError: (error) =>
+      toast.error("Gagal mengupdate kelas", { description: error.message }),
   });
 
   const deleteKelasMutation = api.peserta.deleteKelas.useMutation({
-    onSuccess: () => utils.peserta.getAllKelas.invalidate(),
+    onSuccess: () => {
+      void utils.peserta.getAllKelas.invalidate();
+      toast.success("Berhasil menghapus kelas");
+    },
     onError: (error) => {
-      alert("Gagal menghapus: " + error.message);
+      toast.error("Gagal menghapus kelas", { description: error.message });
       console.error("Detail error hapus kelas:", error);
     },
   });
@@ -131,6 +139,7 @@ export function KelasTable() {
   // === DEFINISI KOLOM (Dimasukkan ke useMemo agar bisa baca fungsi Handle) ===
   const columns = useMemo<ColumnDef<Kelas>[]>(
     () => [
+      { accessorKey: "id", header: "ID" },
       { accessorKey: "jenjang", header: "Jenjang" },
       { accessorKey: "tingkat", header: "Tingkat" },
       { accessorKey: "namaKelas", header: "Nama Kelas" },
@@ -176,7 +185,7 @@ export function KelasTable() {
 
   return (
     <div className="mt-4 space-y-4">
-      <div className="flex justify-end">
+      <div>
         <Button onClick={openCreateDialog}>
           <Plus className="mr-2 h-4 w-4" />
           Tambah Kelas
@@ -285,7 +294,13 @@ export function KelasTable() {
         </DialogContent>
       </Dialog>
 
-      <DataTable columns={columns} data={data} isLoading={isLoading} />
+      <DataTable
+        searchKey="namaKelas"
+        searchPlaceholder="Cari nama atau rincian kelas..."
+        columns={columns}
+        data={data}
+        isLoading={isLoading}
+      />
     </div>
   );
 }

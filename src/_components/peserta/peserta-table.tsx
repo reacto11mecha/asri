@@ -5,6 +5,7 @@ import { api } from "~/trpc/react";
 import { DataTable } from "~/_components/data-table";
 import { getPesertaColumns } from "./columns";
 import { PesertaTableActions } from "./peserta-table-actions";
+import { toast } from "sonner";
 
 export function PesertaTable() {
   const utils = api.useUtils();
@@ -16,13 +17,21 @@ export function PesertaTable() {
 
   // Mutasi untuk mengaitkan wali asuh langsung dari tabel
   const assignWaliMutation = api.peserta.assignWaliAsuh.useMutation({
-    onSuccess: () => utils.peserta.getAll.invalidate(),
-    onError: (error) => alert("Gagal menugaskan Wali Asuh: " + error.message),
+    onSuccess: () => {
+      void utils.peserta.getAll.invalidate();
+      toast.success("Berhasil menetapkan Wali Asuh!");
+    },
+    onError: (error) =>
+      toast.error("Gagal menugaskan Wali Asuh", { description: error.message }),
   });
 
   const deletePesertaMutation = api.peserta.deletePeserta.useMutation({
-    onSuccess: () => utils.peserta.getAll.invalidate(),
-    onError: (error) => alert("Gagal menghapus data: " + error.message),
+    onSuccess: () => {
+      void utils.peserta.getAll.invalidate();
+      toast.success("Berhasil menghapus peserta!");
+    },
+    onError: (error) =>
+      toast.error("Gagal menghapus peserta", { description: error.message }),
   });
 
   const handleAssignWali = (pesertaId: string, waliAsuhId: string | null) => {
@@ -65,6 +74,8 @@ export function PesertaTable() {
         columns={columns}
         data={daftarPeserta}
         isLoading={isLoading}
+        searchKey="namaLengkap"
+        searchPlaceholder="Cari nama peserta..."
         initialColumnVisibility={{
           status: false,
           nisn: false,
