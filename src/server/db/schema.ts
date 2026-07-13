@@ -129,8 +129,8 @@ export const sesiAbsensi = pgTable("sesi_absensi", {
     .references(() => kategoriAbsensi.id, { onDelete: "restrict" }),
 
   namaSesi: text("nama_sesi").notNull(),
-  waktuMulai: time("waktu_mulai").notNull(),
-  waktuSelesai: time("waktu_selesai").notNull(),
+  waktuMulai: time("waktu_mulai"),
+  waktuSelesai: time("waktu_selesai"),
 
   isMandatory: boolean("is_mandatory").default(true).notNull(),
 

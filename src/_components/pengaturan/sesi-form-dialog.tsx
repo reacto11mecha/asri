@@ -5,7 +5,7 @@ import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { api } from "~/trpc/react";
-import { Button, buttonVariants } from "~/components/ui/button"; // <-- Import buttonVariants
+import { Button, buttonVariants } from "~/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -17,17 +17,18 @@ import { Input } from "~/components/ui/input";
 import { toast } from "sonner";
 import { Plus, Edit } from "lucide-react";
 
+// Hapus .default() pada isMandatory dan isActive agar tipe input/output konsisten
 const formSchema = z.object({
   namaSesi: z.string().min(1, "Nama sesi wajib diisi"),
-  waktuMulai: z.string(),
-  waktuSelesai: z.string(),
-  isMandatory: z.boolean().default(true),
+  waktuMulai: z.string().optional(),
+  waktuSelesai: z.string().optional(),
+  isMandatory: z.boolean(),
   targetJenjang: z
     .array(z.enum(["SD", "SMP", "SMA"]))
     .min(1, "Pilih minimal 1 jenjang"),
   poinTepatWaktu: z.coerce.number(),
   poinTelat: z.coerce.number(),
-  isActive: z.boolean().default(true),
+  isActive: z.boolean(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -49,8 +50,8 @@ export function SesiFormDialog({
     resolver: zodResolver(formSchema),
     defaultValues: {
       namaSesi: initialData?.namaSesi || "",
-      waktuMulai: formatTimeForInput(initialData?.waktuMulai) || "00:00",
-      waktuSelesai: formatTimeForInput(initialData?.waktuSelesai) || "00:00",
+      waktuMulai: formatTimeForInput(initialData?.waktuMulai) || "",
+      waktuSelesai: formatTimeForInput(initialData?.waktuSelesai) || "",
       isMandatory: initialData?.isMandatory ?? true,
       targetJenjang: initialData?.targetJenjang || ["SD", "SMP", "SMA"],
       poinTepatWaktu: initialData?.poinTepatWaktu || 0,
@@ -59,23 +60,43 @@ export function SesiFormDialog({
     },
   });
 
-  const mutation = api.pengaturan[
-    initialData ? "updateSesi" : "createSesi"
-  ].useMutation({
+  const createMutation = api.pengaturan.createSesi.useMutation({
     onSuccess: () => {
-      toast.success(
-        `Sesi berhasil ${initialData ? "diperbarui" : "ditambahkan"}`,
-      );
+      toast.success("Sesi berhasil ditambahkan");
       utils.pengaturan.getKategoriWithSesi.invalidate();
       setOpen(false);
-      if (!initialData) form.reset();
+      form.reset();
     },
     onError: (e) => toast.error(e.message),
   });
 
+  const updateMutation = api.pengaturan.updateSesi.useMutation({
+    onSuccess: () => {
+      toast.success("Sesi berhasil diperbarui");
+      utils.pengaturan.getKategoriWithSesi.invalidate();
+      setOpen(false);
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const onSubmit = (data: FormValues) => {
+    if (initialData) {
+      updateMutation.mutate({
+        id: initialData.id,
+        ...data,
+      });
+    } else {
+      createMutation.mutate({
+        kategoriId: kategoriId,
+        ...data,
+      });
+    }
+  };
+
+  const isPending = createMutation.isPending || updateMutation.isPending;
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      {/* MENGGUNAKAN BUTTON VARIANTS PADA TRIGGER */}
       <DialogTrigger
         className={
           initialData
@@ -101,16 +122,8 @@ export function SesiFormDialog({
             {initialData ? "Edit Sesi Jadwal" : "Tambah Sesi Baru"}
           </DialogTitle>
         </DialogHeader>
-        <form
-          onSubmit={form.handleSubmit((d) =>
-            mutation.mutate(
-              initialData
-                ? { id: initialData.id, ...d, kategoriId }
-                : { ...d, kategoriId },
-            ),
-          )}
-          className="mt-2 space-y-5"
-        >
+
+        <form onSubmit={form.handleSubmit(onSubmit)} className="mt-2 space-y-5">
           <div className="space-y-2">
             <label className="text-sm font-medium">Nama Sesi</label>
             <Input
@@ -123,12 +136,18 @@ export function SesiFormDialog({
             <div className="space-y-2">
               <label className="text-sm font-medium">Waktu Mulai</label>
               <Input type="time" {...form.register("waktuMulai")} />
+              <p className="text-muted-foreground text-[10px]">
+                Kosongkan jika waktu fleksibel
+              </p>
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">
-                Batas Waktu Akhir (Selesai)
+                Batas Akhir (Selesai)
               </label>
               <Input type="time" {...form.register("waktuSelesai")} />
+              <p className="text-muted-foreground text-[10px]">
+                Kosongkan jika waktu fleksibel
+              </p>
             </div>
           </div>
 
@@ -198,7 +217,7 @@ export function SesiFormDialog({
           </div>
 
           <div className="flex justify-end pt-4">
-            <Button type="submit" disabled={mutation.isPending}>
+            <Button type="submit" disabled={isPending}>
               Simpan Jadwal
             </Button>
           </div>

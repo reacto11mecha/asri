@@ -9,6 +9,17 @@ import {
 } from "~/server/db/schema";
 import { eq, asc } from "drizzle-orm";
 
+const regex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$/;
+
+const formatTime = (timeStr?: string | null) => {
+  if (!timeStr || timeStr.trim() === "") return null;
+
+  const passed = regex.test(timeStr);
+  if (!passed) throw new Error("Format waktu tidak valid");
+
+  return timeStr.length === 5 ? `${timeStr}:00` : timeStr;
+};
+
 export const pengaturanRouter = createTRPCRouter({
   // ==========================================
   // MANAJEMEN AKUN
@@ -103,18 +114,8 @@ export const pengaturanRouter = createTRPCRouter({
       z.object({
         kategoriId: z.string(),
         namaSesi: z.string().min(1, "Nama Sesi wajib diisi"),
-        waktuMulai: z
-          .string()
-          .regex(
-            /^([0-1]?[0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$/,
-            "Format waktu salah",
-          ),
-        waktuSelesai: z
-          .string()
-          .regex(
-            /^([0-1]?[0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$/,
-            "Format waktu salah",
-          ),
+        waktuMulai: z.string().optional().nullable(),
+        waktuSelesai: z.string().optional().nullable(),
         isMandatory: z.boolean(),
         targetJenjang: z
           .array(z.enum(["SD", "SMP", "SMA"]))
@@ -125,10 +126,6 @@ export const pengaturanRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      // Pastikan format jam memiliki detik untuk tipe data 'time' Postgres, cth: "15:30:00"
-      const formatTime = (timeStr: string) =>
-        timeStr.length === 5 ? `${timeStr}:00` : timeStr;
-
       await ctx.db.insert(sesiAbsensi).values({
         kategoriId: input.kategoriId,
         namaSesi: input.namaSesi,
@@ -147,18 +144,8 @@ export const pengaturanRouter = createTRPCRouter({
       z.object({
         id: z.string(),
         namaSesi: z.string().min(1, "Nama Sesi wajib diisi"),
-        waktuMulai: z
-          .string()
-          .regex(
-            /^([0-1]?[0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$/,
-            "Format waktu salah",
-          ),
-        waktuSelesai: z
-          .string()
-          .regex(
-            /^([0-1]?[0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$/,
-            "Format waktu salah",
-          ),
+        waktuMulai: z.string().optional().nullable(),
+        waktuSelesai: z.string().optional().nullable(),
         isMandatory: z.boolean(),
         targetJenjang: z
           .array(z.enum(["SD", "SMP", "SMA"]))
@@ -169,9 +156,6 @@ export const pengaturanRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const formatTime = (timeStr: string) =>
-        timeStr.length === 5 ? `${timeStr}:00` : timeStr;
-
       await ctx.db
         .update(sesiAbsensi)
         .set({
