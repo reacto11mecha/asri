@@ -1,12 +1,13 @@
 // src/server/api/routers/pengaturan.ts
 import { z } from "zod";
-import { createTRPCRouter, adminProcedure } from "~/server/api/trpc";
+import { createTRPCRouter, superAdminProcedure } from "~/server/api/trpc";
 import {
   user,
   kategoriAbsensi,
   sesiAbsensi,
   masterPelanggaran,
   masterJabatan,
+  hariLibur,
 } from "~/server/db/schema";
 import { eq, asc, not, and } from "drizzle-orm";
 
@@ -25,17 +26,17 @@ export const pengaturanRouter = createTRPCRouter({
   // ====================================================================
   // A. KELOLA MASTER JABATAN (ROLE & LABEL)
   // ====================================================================
-  getJabatans: adminProcedure.query(async ({ ctx }) => {
+  getJabatans: superAdminProcedure.query(async ({ ctx }) => {
     return ctx.db.query.masterJabatan.findMany({
       orderBy: (j, { asc }) => [asc(j.namaJabatan)],
     });
   }),
 
-  createJabatan: adminProcedure
+  createJabatan: superAdminProcedure
     .input(
       z.object({
         namaJabatan: z.string().min(1, "Nama Jabatan wajib diisi"),
-        role: z.enum(["ADMIN", "STAFF"]),
+        role: z.enum(["SUPERADMIN", "STAFF", "SUPPORTER"]),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -45,12 +46,12 @@ export const pengaturanRouter = createTRPCRouter({
       });
     }),
 
-  updateJabatan: adminProcedure
+  updateJabatan: superAdminProcedure
     .input(
       z.object({
         id: z.string(),
         namaJabatan: z.string().min(1, "Nama Jabatan wajib diisi"),
-        role: z.enum(["ADMIN", "STAFF"]),
+        role: z.enum(["SUPERADMIN", "STAFF", "SUPPORTER"]),
         isActive: z.boolean(),
       }),
     )
@@ -65,7 +66,7 @@ export const pengaturanRouter = createTRPCRouter({
         .where(eq(masterJabatan.id, input.id));
     }),
 
-  deleteJabatan: adminProcedure
+  deleteJabatan: superAdminProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       await ctx.db.delete(masterJabatan).where(eq(masterJabatan.id, input.id));
@@ -76,7 +77,7 @@ export const pengaturanRouter = createTRPCRouter({
   // ====================================================================
 
   // 1. Ambil daftar pegawai yang baru login dan menunggu di-approve
-  getPendingUsers: adminProcedure.query(async ({ ctx }) => {
+  getPendingUsers: superAdminProcedure.query(async ({ ctx }) => {
     return ctx.db.query.user.findMany({
       where: eq(user.accountApproved, false),
       orderBy: (u, { desc }) => [desc(u.createdAt)],
@@ -84,7 +85,7 @@ export const pengaturanRouter = createTRPCRouter({
   }),
 
   // 2. Ambil daftar pegawai yang sudah di-approve (beserta nama jabatannya)
-  getApprovedUsers: adminProcedure.query(async ({ ctx }) => {
+  getApprovedUsers: superAdminProcedure.query(async ({ ctx }) => {
     return ctx.db.query.user.findMany({
       where: and(
         eq(user.accountApproved, true),
@@ -98,7 +99,7 @@ export const pengaturanRouter = createTRPCRouter({
   }),
 
   // 3. Approve pegawai baru (Berikan akses masuk & pasangkan jabatannya)
-  approveUser: adminProcedure
+  approveUser: superAdminProcedure
     .input(
       z.object({
         userId: z.string(),
@@ -116,7 +117,7 @@ export const pengaturanRouter = createTRPCRouter({
     }),
 
   // 4. Tolak/Hapus pegawai yang tidak dikenal
-  rejectUser: adminProcedure
+  rejectUser: superAdminProcedure
     .input(z.object({ userId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       // Hapus permanen user dari database agar tidak membebani sistem
@@ -124,7 +125,7 @@ export const pengaturanRouter = createTRPCRouter({
     }),
 
   // 5. Update/Pindahkan jabatan pegawai yang sudah aktif
-  updateUserJabatan: adminProcedure
+  updateUserJabatan: superAdminProcedure
     .input(
       z.object({
         userId: z.string(),
@@ -141,7 +142,7 @@ export const pengaturanRouter = createTRPCRouter({
   // ==========================================
   // READ DATA (Untuk ditampilkan di tabel Pengaturan)
   // ==========================================
-  getKategoriWithSesi: adminProcedure.query(async ({ ctx }) => {
+  getKategoriWithSesi: superAdminProcedure.query(async ({ ctx }) => {
     return ctx.db.query.kategoriAbsensi.findMany({
       with: {
         sesi: {
@@ -152,7 +153,7 @@ export const pengaturanRouter = createTRPCRouter({
     });
   }),
 
-  getMasterPelanggaran: adminProcedure.query(async ({ ctx }) => {
+  getMasterPelanggaran: superAdminProcedure.query(async ({ ctx }) => {
     return ctx.db.query.masterPelanggaran.findMany({
       orderBy: [
         asc(masterPelanggaran.tingkat),
@@ -164,7 +165,7 @@ export const pengaturanRouter = createTRPCRouter({
   // ==========================================
   // CRUD KATEGORI ABSENSI (Induk)
   // ==========================================
-  createKategori: adminProcedure
+  createKategori: superAdminProcedure
     .input(
       z.object({
         namaKategori: z.string().min(1, "Nama Kategori wajib diisi"),
@@ -178,7 +179,7 @@ export const pengaturanRouter = createTRPCRouter({
       });
     }),
 
-  updateKategori: adminProcedure
+  updateKategori: superAdminProcedure
     .input(
       z.object({
         id: z.string(),
@@ -196,7 +197,7 @@ export const pengaturanRouter = createTRPCRouter({
         .where(eq(kategoriAbsensi.id, input.id));
     }),
 
-  deleteKategori: adminProcedure
+  deleteKategori: superAdminProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       await ctx.db
@@ -207,7 +208,7 @@ export const pengaturanRouter = createTRPCRouter({
   // ==========================================
   // CRUD SESI ABSENSI (Anak dari Kategori)
   // ==========================================
-  createSesi: adminProcedure
+  createSesi: superAdminProcedure
     .input(
       z.object({
         kategoriId: z.string(),
@@ -253,7 +254,7 @@ export const pengaturanRouter = createTRPCRouter({
       });
     }),
 
-  updateSesi: adminProcedure
+  updateSesi: superAdminProcedure
     .input(
       z.object({
         id: z.string(),
@@ -301,7 +302,7 @@ export const pengaturanRouter = createTRPCRouter({
         .where(eq(sesiAbsensi.id, input.id));
     }),
 
-  deleteSesi: adminProcedure
+  deleteSesi: superAdminProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       await ctx.db.delete(sesiAbsensi).where(eq(sesiAbsensi.id, input.id));
@@ -310,7 +311,7 @@ export const pengaturanRouter = createTRPCRouter({
   // ==========================================
   // CRUD MASTER PELANGGARAN
   // ==========================================
-  createPelanggaran: adminProcedure
+  createPelanggaran: superAdminProcedure
     .input(
       z.object({
         namaPelanggaran: z.string().min(1, "Nama Pelanggaran wajib diisi"),
@@ -328,7 +329,7 @@ export const pengaturanRouter = createTRPCRouter({
       });
     }),
 
-  updatePelanggaran: adminProcedure
+  updatePelanggaran: superAdminProcedure
     .input(
       z.object({
         id: z.string(),
@@ -350,11 +351,77 @@ export const pengaturanRouter = createTRPCRouter({
         .where(eq(masterPelanggaran.id, input.id));
     }),
 
-  deletePelanggaran: adminProcedure
+  deletePelanggaran: superAdminProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       await ctx.db
         .delete(masterPelanggaran)
         .where(eq(masterPelanggaran.id, input.id));
+    }),
+
+  // ==========================================
+  // CRUD HARI LIBUR
+  // ==========================================
+  getHariLibur: superAdminProcedure.query(async ({ ctx }) => {
+    return ctx.db.query.hariLibur.findMany({
+      orderBy: [asc(hariLibur.tanggalMulai)],
+    });
+  }),
+
+  createHariLibur: superAdminProcedure
+    .input(
+      z.object({
+        namaLibur: z.string().min(1, "Nama libur wajib diisi"),
+        tanggalMulai: z.string(),
+        tanggalSelesai: z.string(),
+        targetJenjang: z
+          .array(z.enum(["SD", "SMP", "SMA"]))
+          .min(1, "Pilih minimal 1 jenjang"),
+        deskripsi: z.string().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await ctx.db.insert(hariLibur).values({
+        namaLibur: input.namaLibur,
+        tanggalMulai: input.tanggalMulai,
+        tanggalSelesai: input.tanggalSelesai,
+        targetJenjang: input.targetJenjang,
+        deskripsi: input.deskripsi,
+        isActive: true,
+      });
+    }),
+
+  updateHariLibur: superAdminProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        namaLibur: z.string().min(1, "Nama libur wajib diisi"),
+        tanggalMulai: z.string(),
+        tanggalSelesai: z.string(),
+        targetJenjang: z
+          .array(z.enum(["SD", "SMP", "SMA"]))
+          .min(1, "Pilih minimal 1 jenjang"),
+        deskripsi: z.string().optional(),
+        isActive: z.boolean(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await ctx.db
+        .update(hariLibur)
+        .set({
+          namaLibur: input.namaLibur,
+          tanggalMulai: input.tanggalMulai,
+          tanggalSelesai: input.tanggalSelesai,
+          targetJenjang: input.targetJenjang,
+          deskripsi: input.deskripsi,
+          isActive: input.isActive,
+        })
+        .where(eq(hariLibur.id, input.id));
+    }),
+
+  deleteHariLibur: superAdminProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      await ctx.db.delete(hariLibur).where(eq(hariLibur.id, input.id));
     }),
 });

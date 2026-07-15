@@ -1,5 +1,5 @@
 // src/server/api/routers/peserta.ts
-import { createTRPCRouter, adminProcedure } from "~/server/api/trpc";
+import { createTRPCRouter, staffProcedure } from "~/server/api/trpc";
 import { eq, desc, asc, and } from "drizzle-orm";
 import { pesertaDidik, kelas, user } from "~/server/db/schema";
 import JSZip from "jszip";
@@ -58,7 +58,7 @@ const insertPesertaSchema = z.object({
 export type InsertPesertaType = z.infer<typeof insertPesertaSchema>;
 
 export const pesertaRouter = createTRPCRouter({
-  getAll: adminProcedure.query(async ({ ctx }) => {
+  getAll: staffProcedure.query(async ({ ctx }) => {
     return await ctx.db.query.pesertaDidik.findMany({
       with: {
         kelas: true,
@@ -68,7 +68,7 @@ export const pesertaRouter = createTRPCRouter({
     });
   }),
 
-  assignWaliAsuh: adminProcedure
+  assignWaliAsuh: staffProcedure
     .input(
       z.object({
         pesertaId: z.string(),
@@ -82,14 +82,14 @@ export const pesertaRouter = createTRPCRouter({
         .where(eq(pesertaDidik.id, input.pesertaId));
     }),
 
-  getWaliAsuh: adminProcedure.query(async ({ ctx }) => {
+  getWaliAsuh: staffProcedure.query(async ({ ctx }) => {
     return await ctx.db.query.user.findMany({
       columns: { id: true, name: true, email: true, image: true },
       orderBy: [asc(user.name)],
     });
   }),
 
-  createPeserta: adminProcedure
+  createPeserta: staffProcedure
     .input(insertPesertaSchema)
     .mutation(async ({ ctx, input }) => {
       const existing = await ctx.db.query.pesertaDidik.findFirst({
@@ -121,7 +121,7 @@ export const pesertaRouter = createTRPCRouter({
       });
     }),
 
-  createBanyakPeserta: adminProcedure
+  createBanyakPeserta: staffProcedure
     .input(z.array(insertPesertaSchema))
     .mutation(async ({ ctx, input }) => {
       const parseDate = (val?: string) =>
@@ -153,7 +153,7 @@ export const pesertaRouter = createTRPCRouter({
         .onConflictDoNothing({ target: pesertaDidik.nipd });
     }),
 
-  updatePeserta: adminProcedure
+  updatePeserta: staffProcedure
     .input(
       insertPesertaSchema.extend({
         id: z.string(),
@@ -217,7 +217,7 @@ export const pesertaRouter = createTRPCRouter({
         .where(eq(pesertaDidik.id, input.id));
     }),
 
-  deletePeserta: adminProcedure
+  deletePeserta: staffProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       return await ctx.db
@@ -225,13 +225,13 @@ export const pesertaRouter = createTRPCRouter({
         .where(eq(pesertaDidik.id, input.id));
     }),
 
-  getAllKelas: adminProcedure.query(async ({ ctx }) => {
+  getAllKelas: staffProcedure.query(async ({ ctx }) => {
     return await ctx.db.query.kelas.findMany({
       orderBy: [asc(kelas.jenjang), asc(kelas.tingkat), asc(kelas.namaKelas)],
     });
   }),
 
-  downloadExcel: adminProcedure.mutation(async ({ ctx }) => {
+  downloadExcel: staffProcedure.mutation(async ({ ctx }) => {
     const ExcelJS = (await import("exceljs")).default;
     const workbook = new ExcelJS.Workbook();
     const jenjangList = ["SD", "SMP", "SMA"] as const;
@@ -391,7 +391,7 @@ export const pesertaRouter = createTRPCRouter({
     return Buffer.from(buffer).toString("base64");
   }),
 
-  downloadQrZip: adminProcedure.mutation(async ({ ctx }) => {
+  downloadQrZip: staffProcedure.mutation(async ({ ctx }) => {
     const allPeserta = await ctx.db
       .select({
         nipd: pesertaDidik.nipd,
@@ -441,7 +441,7 @@ export const pesertaRouter = createTRPCRouter({
     return content.toString("base64");
   }),
 
-  createKelas: adminProcedure
+  createKelas: staffProcedure
     .input(
       z.object({
         jenjang: z.enum(["SD", "SMP", "SMA"]),
@@ -457,7 +457,7 @@ export const pesertaRouter = createTRPCRouter({
       });
     }),
 
-  updateKelas: adminProcedure
+  updateKelas: staffProcedure
     .input(
       z.object({
         id: z.string(),
@@ -477,7 +477,7 @@ export const pesertaRouter = createTRPCRouter({
         .where(eq(kelas.id, input.id));
     }),
 
-  deleteKelas: adminProcedure
+  deleteKelas: staffProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       return await ctx.db.delete(kelas).where(eq(kelas.id, input.id));

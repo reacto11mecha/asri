@@ -251,7 +251,10 @@ export default function RekapPage() {
                 {/* TAMBAHAN DROPDOWN KELAS */}
                 <div className="space-y-2">
                   <Label htmlFor="pdfKelas">Target Kelas</Label>
-                  <Select value={pdfKelasId} onValueChange={(val) => setPdfKelasId(val ?? "ALL")}>
+                  <Select
+                    value={pdfKelasId}
+                    onValueChange={(val) => setPdfKelasId(val ?? "ALL")}
+                  >
                     <SelectTrigger id="pdfKelas" className="w-full">
                       <SelectValue>
                         {pdfKelasId === "ALL"
@@ -288,11 +291,15 @@ export default function RekapPage() {
 
                 <div className="space-y-2">
                   <Label htmlFor="pdfSesi">Sesi Kegiatan</Label>
-                  <Select value={pdfSesiId} onValueChange={(val) => setPdfSesiId(val ?? "")}>
+                  <Select
+                    value={pdfSesiId}
+                    onValueChange={(val) => setPdfSesiId(val ?? "")}
+                  >
                     <SelectTrigger id="pdfSesi" className="w-full">
                       <SelectValue>
                         {pdfSesiId
-                          ? daftarSesi.find((s) => s.id === pdfSesiId)?.namaSesi ?? "Pilih Sesi"
+                          ? (daftarSesi.find((s) => s.id === pdfSesiId)
+                              ?.namaSesi ?? "Pilih Sesi")
                           : loadingOptions
                             ? "Memuat..."
                             : "Pilih Sesi"}

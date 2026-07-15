@@ -5,6 +5,7 @@ import {
   masterPelanggaran,
   masterJabatan,
   kelas,
+  hariLibur,
   pesertaDidik,
   logAbsensi,
 } from "./schema";
@@ -47,20 +48,26 @@ async function main() {
     const dataJabatan = [
       {
         id: crypto.randomUUID(),
-        namaJabatan: "Wali Asrama",
-        role: "ADMIN" as const,
+        namaJabatan: "Admin Wali Asrama",
+        role: "SUPERADMIN" as const,
         isActive: true,
       },
       {
         id: crypto.randomUUID(),
-        namaJabatan: "Wali Asuh",
-        role: "ADMIN" as const,
+        namaJabatan: "Admin Wali Asuh",
+        role: "SUPERADMIN" as const,
+        isActive: true,
+      },
+      {
+        id: crypto.randomUUID(),
+        namaJabatan: "Staff Wali Asuh",
+        role: "STAFF" as const,
         isActive: true,
       },
       {
         id: crypto.randomUUID(),
         namaJabatan: "Guru",
-        role: "STAFF" as const,
+        role: "SUPPORTER" as const,
         isActive: true,
       },
     ];
@@ -433,6 +440,30 @@ async function main() {
         if (!isNaN(n) && n > 0) jmlHari = n;
         else console.log("Input tidak valid, akan menggunakan 7 hari.");
       }
+
+      console.log("Mempersiapkan data libur...");
+      const dataLibur = [
+        {
+          id: crypto.randomUUID(),
+          namaLibur: "Libur Idul Fitri 1447 H",
+          tanggalMulai: "2026-03-20",
+          tanggalSelesai: "2026-03-22",
+          targetJenjang: ["SD", "SMP", "SMA"] as ("SD" | "SMP" | "SMA")[],
+          isActive: true,
+          deskripsi: "Libur nasional Idul Fitri",
+        },
+        {
+          id: crypto.randomUUID(),
+          namaLibur: "Libur Idul Adha 1447 H",
+          tanggalMulai: "2026-05-27",
+          tanggalSelesai: "2026-05-27",
+          targetJenjang: ["SD", "SMP", "SMA"] as ("SD" | "SMP" | "SMA")[],
+          isActive: true,
+          deskripsi: "Libur nasional Idul Adha",
+        },
+      ];
+      await db.insert(hariLibur).values(dataLibur).onConflictDoNothing();
+      console.log("✅ Data libur berhasil dimasukkan.");
 
       // ==========================================
       // 5. SEEDING KELAS

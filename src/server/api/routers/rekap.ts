@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createTRPCRouter, adminProcedure } from "~/server/api/trpc";
+import { createTRPCRouter, staffProcedure } from "~/server/api/trpc";
 import {
   and,
   eq,
@@ -13,6 +13,7 @@ import {
   logAbsensi,
   pesertaDidik,
   kelas,
+  hariLibur,
   sesiAbsensi,
   kategoriAbsensi,
   masterPelanggaran,
@@ -48,7 +49,7 @@ type DetailRow = {
 };
 
 export const rekapRouter = createTRPCRouter({
-  generateExcel: adminProcedure
+  generateExcel: staffProcedure
     .input(
       z.object({
         jenjang: z.enum(["SD", "SMP", "SMA"]),
@@ -140,6 +141,23 @@ export const rekapRouter = createTRPCRouter({
         )
         .where(and(dateFilter, isNotNull(logAbsensi.pelanggaranId)));
 
+      const hariLiburList = await ctx.db
+        .select({
+          tanggalMulai: hariLibur.tanggalMulai,
+          tanggalSelesai: hariLibur.tanggalSelesai,
+          targetJenjang: hariLibur.targetJenjang,
+        })
+        .from(hariLibur)
+        .where(eq(hariLibur.isActive, true));
+
+      const isLibur = (tanggal: string) =>
+        hariLiburList.some(
+          (libur) =>
+            libur.targetJenjang.includes(input.jenjang) &&
+            tanggal >= libur.tanggalMulai &&
+            tanggal <= libur.tanggalSelesai,
+        );
+
       // 3. AGREGASI RINGKASAN
       const studentStats = new Map<string, RingkasanRow>();
       for (const s of students) {
@@ -192,7 +210,10 @@ export const rekapRouter = createTRPCRouter({
       const cursor = new Date(input.startDate);
       const endDateObj = new Date(input.endDate);
       while (cursor <= endDateObj) {
-        dateList.push(format(cursor, "yyyy-MM-dd"));
+        const tglStr = format(cursor, "yyyy-MM-dd");
+        if (!isLibur(tglStr)) {
+          dateList.push(tglStr);
+        }
         cursor.setDate(cursor.getDate() + 1);
       }
 
@@ -558,7 +579,7 @@ export const rekapRouter = createTRPCRouter({
       return Buffer.from(buffer).toString("base64");
     }),
 
-  getDataPdfSesi: adminProcedure
+  getDataPdfSesi: staffProcedure
     .input(
       z.object({
         tanggal: z.string(),

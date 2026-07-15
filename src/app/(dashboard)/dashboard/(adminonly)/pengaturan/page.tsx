@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { KategoriFormDialog } from "~/_components/pengaturan/kategori-form-dialog";
 import { SesiFormDialog } from "~/_components/pengaturan/sesi-form-dialog";
 import { PelanggaranFormDialog } from "~/_components/pengaturan/pelanggaran-form-dialog";
+import { LiburTab } from "~/_components/pengaturan/libur-tab";
 import { Trash2 } from "lucide-react";
 import { PegawaiTab } from "~/_components/pengaturan/pegawai-tab";
 
@@ -58,6 +59,7 @@ export default function PengaturanPage() {
           <TabsTrigger value="kategori">Kategori & Sesi Rutin</TabsTrigger>
           <TabsTrigger value="pelanggaran">Master Pelanggaran</TabsTrigger>
           <TabsTrigger value="pegawai">Daftar Pengguna</TabsTrigger>
+          <TabsTrigger value="libur">Kalender Libur</TabsTrigger>
         </TabsList>
 
         {/* TAB 1: KATEGORI & SESI */}
@@ -259,6 +261,9 @@ export default function PengaturanPage() {
         </TabsContent>
         <TabsContent value="pegawai">
           <PegawaiTab />
+        </TabsContent>
+        <TabsContent value="libur">
+          <LiburTab />
         </TabsContent>
       </Tabs>
     </div>

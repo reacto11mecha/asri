@@ -47,6 +47,8 @@ RUN adduser --system --uid 1001 nextjs
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder /app/drizzle ./drizzle
+COPY --from=builder /app/drizzle.config.ts ./drizzle.config.ts
 
 # Gunakan user non-root
 USER nextjs
@@ -58,4 +60,4 @@ ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
 # Jalankan server bawaan Next.js standalone
-CMD ["node", "server.js"]
+ENTRYPOINT ["sh", "-c", "pnpm drizzle-kit migrate && exec node server.js"]

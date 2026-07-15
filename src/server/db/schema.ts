@@ -45,7 +45,7 @@ export const agamaEnum = pgEnum("agama", [
   "KONGHUCU",
   "LAINNYA",
 ]);
-export const roleEnum = pgEnum("role", ["ADMIN", "STAFF"]);
+export const roleEnum = pgEnum("role", ["SUPERADMIN", "STAFF", "SUPPORTER"]);
 
 // ==========================================
 // BETTER AUTH TABLES
@@ -190,6 +190,24 @@ export const masterPelanggaran = pgTable("master_pelanggaran", {
   tingkat: tingkatPelanggaranEnum("tingkat").notNull(), // RINGAN, SEDANG, BERAT
   poinMinus: integer("poin_minus").notNull(), // Bobot poin (biasanya negatif)
   isActive: boolean("is_active").default(true).notNull(),
+});
+
+export const hariLibur = pgTable("hari_libur", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  namaLibur: text("nama_libur").notNull(), // contoh: "Libur Idul Fitri 1446 H"
+  tanggalMulai: date("tanggal_mulai").notNull(),
+  tanggalSelesai: date("tanggal_selesai").notNull(),
+  targetJenjang: jenjangEnum("target_jenjang").array().notNull(), // SD, SMP, SMA (bisa multiple)
+  isActive: boolean("is_active").default(true).notNull(),
+  deskripsi: text("deskripsi"), // opsional, alasan libur
+  createdAt: timestamp("created_at")
+    .$defaultFn(() => new Date())
+    .notNull(),
+  updatedAt: timestamp("updated_at")
+    .$defaultFn(() => new Date())
+    .notNull(),
 });
 
 // ==========================================

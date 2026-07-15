@@ -10,7 +10,7 @@
 import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import { ZodError } from "zod";
-import { and, eq, isNotNull } from "drizzle-orm";
+import { and, eq, inArray, isNotNull } from "drizzle-orm";
 
 import { auth } from "~/server/better-auth";
 import { db } from "~/server/db";
@@ -153,9 +153,10 @@ export const protectedProcedure = t.procedure
     });
   });
 
-export const adminProcedure = t.procedure
-  .use(timingMiddleware)
-  .use(async ({ ctx, next }) => {
+const procedureConstructor = (
+  roles: ("SUPERADMIN" | "STAFF" | "SUPPORTER")[],
+) =>
+  t.procedure.use(timingMiddleware).use(async ({ ctx, next }) => {
     if (!ctx.session?.user) {
       throw new TRPCError({ code: "UNAUTHORIZED" });
     }
@@ -165,13 +166,16 @@ export const adminProcedure = t.procedure
       .from(user)
       .innerJoin(masterJabatan, eq(user.jabatanId, masterJabatan.id))
       .where(
-        and(eq(user.id, ctx.session.user.id), eq(masterJabatan.role, "ADMIN")),
+        and(
+          eq(user.id, ctx.session.user.id),
+          inArray(masterJabatan.role, roles),
+        ),
       );
 
     if (currentUserIsAdmin.length < 1)
       throw new TRPCError({
         code: "UNAUTHORIZED",
-        message: "Anda bukan admin.",
+        message: "Anda tidak memiliki akses.",
       });
 
     return next({
@@ -181,3 +185,6 @@ export const adminProcedure = t.procedure
       },
     });
   });
+
+export const superAdminProcedure = procedureConstructor(["SUPERADMIN"]);
+export const staffProcedure = procedureConstructor(["SUPERADMIN", "STAFF"]);

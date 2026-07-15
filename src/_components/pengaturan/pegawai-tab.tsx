@@ -276,10 +276,12 @@ export function PegawaiTab() {
                             <Badge
                               variant={
                                 u.jabatan
-                                  ? u.jabatan.role === "ADMIN"
+                                  ? u.jabatan.role === "SUPERADMIN"
                                     ? "default"
-                                    : "secondary"
-                                  : "secondary"
+                                    : u.jabatan.role === "STAFF"
+                                      ? "secondary"
+                                      : "outline"
+                                  : "outline"
                               }
                             >
                               {u.jabatan?.role ?? "UNSET"}
@@ -345,7 +347,13 @@ export function PegawaiTab() {
                           Otoritas Sistem:
                         </span>
                         <Badge
-                          variant={j.role === "ADMIN" ? "default" : "secondary"}
+                          variant={
+                            j.role === "SUPERADMIN"
+                              ? "default"
+                              : j.role === "STAFF"
+                                ? "secondary"
+                                : "outline"
+                          }
                           className="text-[10px]"
                         >
                           {j.role}
@@ -370,7 +378,7 @@ export function PegawaiTab() {
               e.preventDefault();
               createJabatan.mutate({
                 namaJabatan: formJabatan.namaJabatan,
-                role: formJabatan.role as "ADMIN" | "STAFF",
+                role: formJabatan.role as "SUPERADMIN" | "STAFF" | "SUPPORTER",
               });
             }}
           >

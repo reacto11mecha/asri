@@ -184,19 +184,20 @@ export async function generateLaporanSesiPdf(data: PdfDataPayload) {
       lineColor: [0, 0, 0],
     },
     columnStyles: {
-      0: { halign: "center", cellWidth: 8 },   // No
-      1: { cellWidth: 50 },                     // Nama Peserta (lebar untuk nama panjang)
-      2: { halign: "center", cellWidth: 22 },   // Kelas
-      3: { halign: "center", cellWidth: 22 },   // Jam Absen
-      4: { halign: "center", cellWidth: 22 },   // Status
-      5: { cellWidth: "auto" },                 // Keterangan (menyesuaikan sisa)
+      0: { halign: "center", cellWidth: 8 }, // No
+      1: { cellWidth: 50 }, // Nama Peserta (lebar untuk nama panjang)
+      2: { halign: "center", cellWidth: 22 }, // Kelas
+      3: { halign: "center", cellWidth: 22 }, // Jam Absen
+      4: { halign: "center", cellWidth: 22 }, // Status
+      5: { cellWidth: "auto" }, // Keterangan (menyesuaikan sisa)
     },
     styles: { fontSize: 8, cellPadding: 2 },
   });
 
   // 5. BLOK PENGESAHAN
-  const finalY = (doc as jsPDF & { lastAutoTable: { finalY: number } })
-    .lastAutoTable.finalY + 15;
+  const finalY =
+    (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable
+      .finalY + 15;
 
   if (finalY > 240) {
     doc.addPage();

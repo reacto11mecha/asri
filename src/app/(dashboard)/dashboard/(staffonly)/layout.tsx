@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { user } from "~/server/db/schema";
 import { getSession } from "~/server/better-auth/server";
 
-export default async function ProtectedSuperAdminLayout({
+export default async function ProtectedSuperStaffLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -29,8 +29,8 @@ export default async function ProtectedSuperAdminLayout({
     redirect("/");
   }
 
-  if (currentUser.jabatan.role !== "SUPERADMIN") {
-    redirect("/dashboard");
+  if (!["SUPERADMIN", "STAFFF"].includes(currentUser.jabatan.role)) {
+    redirect("/dashboard/aktivitas");
   }
 
   return <>{children}</>;

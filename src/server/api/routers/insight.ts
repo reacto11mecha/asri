@@ -1,6 +1,6 @@
 // src/server/api/routers/insight.ts
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { createTRPCRouter, staffProcedure } from "~/server/api/trpc";
 import { and, eq, inArray, isNotNull, desc, sql } from "drizzle-orm";
 import {
   logAbsensi,
@@ -23,7 +23,7 @@ export const insightRouter = createTRPCRouter({
   // --------------------------------------------------------
   // A. HELPER UI: GET KELAS OPTIONS
   // --------------------------------------------------------
-  getFilterOptions: protectedProcedure
+  getFilterOptions: staffProcedure
     .input(z.object({ jenjang: z.enum(["SD", "SMP", "SMA"]) }))
     .query(async ({ ctx, input }) => {
       const kelasData = await ctx.db.query.kelas.findMany({
@@ -40,7 +40,7 @@ export const insightRouter = createTRPCRouter({
   // --------------------------------------------------------
   // B. RADAR STATISTIK (Hadir, Telat, Alfa, Sakit/Izin, Lainnya)
   // --------------------------------------------------------
-  getStatistikHarian: protectedProcedure
+  getStatistikHarian: staffProcedure
     .input(insightFilterSchema)
     .query(async ({ ctx, input }) => {
       // 1. Ambil peserta aktif sesuai filter
@@ -148,7 +148,7 @@ export const insightRouter = createTRPCRouter({
   // --------------------------------------------------------
   // C. SOROTAN KEDISIPLINAN: SESI BERMASALAH (Accordion)
   // --------------------------------------------------------
-  getEvaluasiSesi: protectedProcedure
+  getEvaluasiSesi: staffProcedure
     .input(insightFilterSchema)
     .query(async ({ ctx, input }) => {
       // Ambil semua peserta didik aktif sesuai filter
@@ -299,7 +299,7 @@ export const insightRouter = createTRPCRouter({
   // --------------------------------------------------------
   // D. SOROTAN KEDISIPLINAN: PELANGGARAN MANUAL
   // --------------------------------------------------------
-  getDaftarPelanggaran: protectedProcedure
+  getDaftarPelanggaran: staffProcedure
     .input(insightFilterSchema)
     .query(async ({ ctx, input }) => {
       const pelanggaranHariIni = await ctx.db
@@ -344,7 +344,7 @@ export const insightRouter = createTRPCRouter({
   // --------------------------------------------------------
   // E. WALL OF FAME (Top Poin Positif)
   // --------------------------------------------------------
-  getWallOfFame: protectedProcedure
+  getWallOfFame: staffProcedure
     .input(
       insightFilterSchema.extend({
         limit: z.number().default(5),

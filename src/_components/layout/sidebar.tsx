@@ -12,19 +12,22 @@ import {
 } from "lucide-react";
 import { cn } from "~/lib/utils";
 
-export function Sidebar({ role }: { role: "ADMIN" | "STAFF" }) {
+export function Sidebar({
+  role,
+}: {
+  role: "SUPERADMIN" | "STAFF" | "SUPPORTER";
+}) {
   const pathname = usePathname();
 
-  const mainMenus = [
-    { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-    {
-      name: "Aktivitas Absensi",
-      href: "/dashboard/aktivitas",
-      icon: ScrollText,
-    },
-
-    ...(role === "ADMIN"
+  const mainMenus =
+    role === "SUPERADMIN"
       ? [
+          { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+          {
+            name: "Aktivitas Absensi",
+            href: "/dashboard/aktivitas",
+            icon: ScrollText,
+          },
           { name: "Rekap Laporan", href: "/dashboard/rekap", icon: FileText },
           { name: "Data Peserta", href: "/dashboard/peserta", icon: Users },
           {
@@ -33,8 +36,24 @@ export function Sidebar({ role }: { role: "ADMIN" | "STAFF" }) {
             icon: Settings,
           },
         ]
-      : []),
-  ];
+      : role === "STAFF"
+        ? [
+            { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+            {
+              name: "Aktivitas Absensi",
+              href: "/dashboard/aktivitas",
+              icon: ScrollText,
+            },
+            { name: "Rekap Laporan", href: "/dashboard/rekap", icon: FileText },
+            { name: "Data Peserta", href: "/dashboard/peserta", icon: Users },
+          ]
+        : [
+            {
+              name: "Aktivitas Absensi",
+              href: "/dashboard/aktivitas",
+              icon: ScrollText,
+            },
+          ];
 
   const scannerMenu = { name: "Scanner", href: "/scanner", icon: QrCode };
 
