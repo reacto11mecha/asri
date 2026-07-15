@@ -33,7 +33,10 @@ type LogEntry = RouterOutputs["aktivitas"]["getRecentLogs"][number];
 function getStatusBadge(log: LogEntry) {
   if (log.statusKehadiran === "HADIR" && log.statusWaktu === "TELAT") {
     return (
-      <Badge variant="outline" className="border-amber-400 bg-amber-50 text-amber-600">
+      <Badge
+        variant="outline"
+        className="border-amber-400 bg-amber-50 text-amber-600"
+      >
         TELAT
       </Badge>
     );
@@ -41,19 +44,28 @@ function getStatusBadge(log: LogEntry) {
   switch (log.statusKehadiran) {
     case "IZIN":
       return (
-        <Badge variant="outline" className="border-blue-300 bg-blue-50 text-blue-600">
+        <Badge
+          variant="outline"
+          className="border-blue-300 bg-blue-50 text-blue-600"
+        >
           IZIN
         </Badge>
       );
     case "SAKIT":
       return (
-        <Badge variant="outline" className="border-orange-300 bg-orange-50 text-orange-600">
+        <Badge
+          variant="outline"
+          className="border-orange-300 bg-orange-50 text-orange-600"
+        >
           SAKIT
         </Badge>
       );
     case "LAINNYA":
       return (
-        <Badge variant="outline" className="border-purple-300 bg-purple-50 text-purple-600">
+        <Badge
+          variant="outline"
+          className="border-purple-300 bg-purple-50 text-purple-600"
+        >
           LAIN-LAIN
         </Badge>
       );
@@ -88,7 +100,9 @@ export default function AktivitasPage() {
   const tingkatOptions = useMemo(() => {
     if (!options?.semuaKelas || !jenjang) return [];
     const tingkatSet = new Set(
-      options.semuaKelas.filter((k) => k.jenjang === jenjang).map((k) => k.tingkat)
+      options.semuaKelas
+        .filter((k) => k.jenjang === jenjang)
+        .map((k) => k.tingkat),
     );
     return Array.from(tingkatSet).sort((a, b) => Number(a) - Number(b));
   }, [options, jenjang]);
@@ -96,7 +110,7 @@ export default function AktivitasPage() {
   const kelasOptions = useMemo(() => {
     if (!options?.semuaKelas || !jenjang || !tingkat) return [];
     return options.semuaKelas.filter(
-      (k) => k.jenjang === jenjang && k.tingkat === tingkat
+      (k) => k.jenjang === jenjang && k.tingkat === tingkat,
     );
   }, [options, jenjang, tingkat]);
 
@@ -122,11 +136,21 @@ export default function AktivitasPage() {
     if (statusKehadiran) payload.statusKehadiran = statusKehadiran;
     if (tipeLog) payload.tipeLog = tipeLog;
     return Object.keys(payload).length > 0 ? payload : undefined;
-  }, [startDate, endDate, jenjang, tingkat, kelasId, sesiId, namaSiswa, statusKehadiran, tipeLog]);
+  }, [
+    startDate,
+    endDate,
+    jenjang,
+    tingkat,
+    kelasId,
+    sesiId,
+    namaSiswa,
+    statusKehadiran,
+    tipeLog,
+  ]);
 
   const { data: logs, isLoading } = api.aktivitas.getRecentLogs.useQuery(
     filterPayload ?? {},
-    { enabled: true }
+    { enabled: true },
   );
 
   const resetFilter = () => {
@@ -160,18 +184,26 @@ export default function AktivitasPage() {
           <CardTitle className="text-lg">Filter & Pencarian</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-6">
             <div className="flex flex-col">
-              <label className="text-xs font-medium mb-1">Dari Tgl</label>
-              <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+              <label className="mb-1 text-xs font-medium">Dari Tgl</label>
+              <Input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+              />
             </div>
             <div className="flex flex-col">
-              <label className="text-xs font-medium mb-1">Sampai Tgl</label>
-              <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+              <label className="mb-1 text-xs font-medium">Sampai Tgl</label>
+              <Input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+              />
             </div>
 
             <div className="flex flex-col">
-              <label className="text-xs font-medium mb-1">Jenjang</label>
+              <label className="mb-1 text-xs font-medium">Jenjang</label>
               <Select
                 value={jenjang || "SEMUA"}
                 onValueChange={(v) => {
@@ -180,7 +212,9 @@ export default function AktivitasPage() {
                   setKelasId("");
                 }}
               >
-                <SelectTrigger><SelectValue placeholder="Semua" /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue placeholder="Semua" />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="SEMUA">Semua</SelectItem>
                   <SelectItem value="SD">SD</SelectItem>
@@ -191,35 +225,43 @@ export default function AktivitasPage() {
             </div>
 
             <div className="flex flex-col">
-              <label className="text-xs font-medium mb-1">Tingkat</label>
+              <label className="mb-1 text-xs font-medium">Tingkat</label>
               <Select
                 value={tingkat || "SEMUA"}
                 disabled={!jenjang}
                 onValueChange={(v) => {
-                  setTingkat(v === "SEMUA" ? "" : v ?? "");
+                  setTingkat(v === "SEMUA" ? "" : (v ?? ""));
                   setKelasId("");
                 }}
               >
-                <SelectTrigger><SelectValue placeholder="Semua" /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue placeholder="Semua" />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="SEMUA">Semua</SelectItem>
                   {tingkatOptions.map((t) => (
-                    <SelectItem key={t} value={t}>{t}</SelectItem>
+                    <SelectItem key={t} value={t}>
+                      {t}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
             <div className="flex flex-col">
-              <label className="text-xs font-medium mb-1">Kelas</label>
+              <label className="mb-1 text-xs font-medium">Kelas</label>
               <Select
                 value={kelasId || "SEMUA"}
                 disabled={!tingkat}
-                onValueChange={(v) => setKelasId(v === "SEMUA" ? "" : v ?? "")}
+                onValueChange={(v) =>
+                  setKelasId(v === "SEMUA" ? "" : (v ?? ""))
+                }
               >
                 <SelectTrigger>
                   <SelectValue>
-                    {selectedKelas ? `${selectedKelas.tingkat} ${selectedKelas.namaKelas}` : "Semua"}
+                    {selectedKelas
+                      ? `${selectedKelas.tingkat} ${selectedKelas.namaKelas}`
+                      : "Semua"}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
@@ -234,10 +276,10 @@ export default function AktivitasPage() {
             </div>
 
             <div className="flex flex-col">
-              <label className="text-xs font-medium mb-1">Sesi</label>
+              <label className="mb-1 text-xs font-medium">Sesi</label>
               <Select
                 value={sesiId || "SEMUA"}
-                onValueChange={(v) => setSesiId(v === "SEMUA" ? "" : v ?? "")}
+                onValueChange={(v) => setSesiId(v === "SEMUA" ? "" : (v ?? ""))}
               >
                 <SelectTrigger>
                   <SelectValue>
@@ -247,24 +289,34 @@ export default function AktivitasPage() {
                 <SelectContent>
                   <SelectItem value="SEMUA">Semua</SelectItem>
                   {semuaSesi.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>{s.namaSesi}</SelectItem>
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.namaSesi}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
             <div className="flex flex-col">
-              <label className="text-xs font-medium mb-1">Nama Siswa</label>
-              <Input placeholder="Cari nama..." value={namaSiswa} onChange={(e) => setNamaSiswa(e.target.value)} />
+              <label className="mb-1 text-xs font-medium">Nama Siswa</label>
+              <Input
+                placeholder="Cari nama..."
+                value={namaSiswa}
+                onChange={(e) => setNamaSiswa(e.target.value)}
+              />
             </div>
 
             <div className="flex flex-col">
-              <label className="text-xs font-medium mb-1">Status</label>
+              <label className="mb-1 text-xs font-medium">Status</label>
               <Select
                 value={statusKehadiran || "SEMUA"}
-                onValueChange={(v) => setStatusKehadiran(v === "SEMUA" ? "" : v ?? "")}
+                onValueChange={(v) =>
+                  setStatusKehadiran(v === "SEMUA" ? "" : (v ?? ""))
+                }
               >
-                <SelectTrigger><SelectValue placeholder="Semua" /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue placeholder="Semua" />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="SEMUA">Semua</SelectItem>
                   <SelectItem value="HADIR">Hadir</SelectItem>
@@ -277,12 +329,18 @@ export default function AktivitasPage() {
             </div>
 
             <div className="flex flex-col">
-              <label className="text-xs font-medium mb-1">Tipe Log</label>
+              <label className="mb-1 text-xs font-medium">Tipe Log</label>
               <Select
                 value={tipeLog || "SEMUA"}
-                onValueChange={(v) => setTipeLog(v === "SEMUA" ? "" : (v as "SESI" | "PELANGGARAN") ?? "")}
+                onValueChange={(v) =>
+                  setTipeLog(
+                    v === "SEMUA" ? "" : ((v as "SESI" | "PELANGGARAN") ?? ""),
+                  )
+                }
               >
-                <SelectTrigger><SelectValue placeholder="Semua" /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue placeholder="Semua" />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="SEMUA">Semua</SelectItem>
                   <SelectItem value="SESI">Sesi Rutin</SelectItem>
@@ -331,11 +389,15 @@ export default function AktivitasPage() {
                           {format(new Date(log.waktuScan), "HH:mm:ss")}
                         </div>
                         <div className="text-muted-foreground text-xs">
-                          {format(new Date(log.tanggal), "dd MMM yyyy", { locale: id })}
+                          {format(new Date(log.tanggal), "dd MMM yyyy", {
+                            locale: id,
+                          })}
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="font-medium">{log.pesertaDidik.namaLengkap}</div>
+                        <div className="font-medium">
+                          {log.pesertaDidik.namaLengkap}
+                        </div>
                         <div className="text-muted-foreground text-xs">
                           {log.pesertaDidik.kelas.jenjang}{" "}
                           {log.pesertaDidik.kelas.tingkat}{" "}
@@ -348,13 +410,18 @@ export default function AktivitasPage() {
                             <span className="font-medium">
                               {log.sesi.kategori?.namaKategori}
                             </span>
-                            <span className="text-muted-foreground mx-1">•</span>
+                            <span className="text-muted-foreground mx-1">
+                              •
+                            </span>
                             <span>{log.sesi.namaSesi}</span>
                           </div>
                         ) : log.pelanggaran ? (
                           <div className="flex items-center gap-2 font-medium text-red-600">
                             {log.pelanggaran.namaPelanggaran}
-                            <Badge variant="destructive" className="h-4 px-1 py-0 text-[10px]">
+                            <Badge
+                              variant="destructive"
+                              className="h-4 px-1 py-0 text-[10px]"
+                            >
                               {log.pelanggaran.tingkat}
                             </Badge>
                           </div>
@@ -369,26 +436,44 @@ export default function AktivitasPage() {
                             log.poinDidapat > 0
                               ? "text-green-600"
                               : log.poinDidapat < 0
-                              ? "text-red-600"
-                              : "text-gray-500"
+                                ? "text-red-600"
+                                : "text-gray-500"
                           }`}
                         >
-                          {log.poinDidapat > 0 ? `+${log.poinDidapat}` : log.poinDidapat}
+                          {log.poinDidapat > 0
+                            ? `+${log.poinDidapat}`
+                            : log.poinDidapat}
                         </div>
                         {log.isPoinManual && (
-                          <div className="text-[10px] text-orange-500 italic">Diedit Manual</div>
+                          <div className="text-[10px] text-orange-500 italic">
+                            Diedit Manual
+                          </div>
                         )}
                       </TableCell>
-                      <TableCell className="max-w-[150px] truncate" title={log.keterangan || "-"}>
-                        {log.keterangan || <span className="text-muted-foreground italic">-</span>}
+                      <TableCell
+                        className="max-w-[150px] truncate"
+                        title={log.keterangan || "-"}
+                      >
+                        {log.keterangan || (
+                          <span className="text-muted-foreground italic">
+                            -
+                          </span>
+                        )}
                       </TableCell>
-                      <TableCell className="text-sm">{log.waliAsuh?.name || "Sistem"}</TableCell>
-                      <TableCell><EditLogDialog log={log} /></TableCell>
+                      <TableCell className="text-sm">
+                        {log.waliAsuh?.name || "Sistem"}
+                      </TableCell>
+                      <TableCell>
+                        <EditLogDialog log={log} />
+                      </TableCell>
                     </TableRow>
                   ))}
                   {logs?.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-muted-foreground py-8 text-center">
+                      <TableCell
+                        colSpan={8}
+                        className="text-muted-foreground py-8 text-center"
+                      >
                         Tidak ada data yang sesuai filter.
                       </TableCell>
                     </TableRow>

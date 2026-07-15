@@ -30,18 +30,20 @@ export const aktivitasRouter = createTRPCRouter({
   // --------------------------------------------------------
   getRecentLogs: protectedProcedure
     .input(
-      z.object({
-        startDate: z.string().optional(),
-        endDate: z.string().optional(),
-        jenjang: z.enum(["SD", "SMP", "SMA"]).optional(),
-        tingkat: z.string().optional(),
-        kelasId: z.string().optional(),
-        sesiId: z.string().optional(),
-        namaSiswa: z.string().optional(),
-        statusKehadiran: statusKehadiranEnum.optional(),
-        tipeLog: tipeLogEnum.optional(),
-        limit: z.number().min(1).max(200).default(100),
-      }).optional()
+      z
+        .object({
+          startDate: z.string().optional(),
+          endDate: z.string().optional(),
+          jenjang: z.enum(["SD", "SMP", "SMA"]).optional(),
+          tingkat: z.string().optional(),
+          kelasId: z.string().optional(),
+          sesiId: z.string().optional(),
+          namaSiswa: z.string().optional(),
+          statusKehadiran: statusKehadiranEnum.optional(),
+          tipeLog: tipeLogEnum.optional(),
+          limit: z.number().min(1).max(200).default(100),
+        })
+        .optional(),
     )
     .query(async ({ ctx, input }) => {
       const conditions = [];
@@ -108,8 +110,14 @@ export const aktivitasRouter = createTRPCRouter({
         .innerJoin(pesertaDidik, eq(logAbsensi.pesertaDidikId, pesertaDidik.id))
         .innerJoin(kelas, eq(pesertaDidik.kelasId, kelas.id))
         .leftJoin(sesiAbsensi, eq(logAbsensi.sesiId, sesiAbsensi.id))
-        .leftJoin(kategoriAbsensi, eq(sesiAbsensi.kategoriId, kategoriAbsensi.id))
-        .leftJoin(masterPelanggaran, eq(logAbsensi.pelanggaranId, masterPelanggaran.id))
+        .leftJoin(
+          kategoriAbsensi,
+          eq(sesiAbsensi.kategoriId, kategoriAbsensi.id),
+        )
+        .leftJoin(
+          masterPelanggaran,
+          eq(logAbsensi.pelanggaranId, masterPelanggaran.id),
+        )
         .leftJoin(user, eq(logAbsensi.waliAsuhId, user.id))
         .where(
           and(
@@ -120,7 +128,7 @@ export const aktivitasRouter = createTRPCRouter({
             input?.namaSiswa
               ? like(pesertaDidik.namaLengkap, `%${input.namaSiswa}%`)
               : undefined,
-          )
+          ),
         )
         .orderBy(desc(logAbsensi.waktuScan))
         .limit(input?.limit ?? 100);

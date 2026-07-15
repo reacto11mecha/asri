@@ -4,9 +4,26 @@
 import { useState, useRef } from "react";
 import { api } from "~/trpc/react";
 import { Button } from "~/components/ui/button";
-import { Plus, Upload, Download, Loader2 } from "lucide-react";
+import {
+  Plus,
+  Upload,
+  Download,
+  Loader2,
+  FileSpreadsheet,
+  QrCode,
+} from "lucide-react";
 import Link from "next/link";
 import type { InsertPesertaType } from "~/server/api/routers/peserta";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "~/components/ui/alert-dialog";
 import {
   Dialog,
   DialogContent,
@@ -69,8 +86,51 @@ export function PesertaTableActions() {
   const [previewData, setPreviewData] = useState<InsertPesertaType[]>([]);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
+  const [showQrDialog, setShowQrDialog] = useState(false);
 
   const { data: daftarKelas = [] } = api.peserta.getAllKelas.useQuery();
+
+  const base64ToBlob = (base64: string, mime: string) => {
+    const byteCharacters = atob(base64);
+    const byteNumbers = new Array(byteCharacters.length);
+
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+
+    const byteArray = new Uint8Array(byteNumbers);
+    return new Blob([byteArray], { type: mime });
+  };
+
+  const triggerDownload = (base64: string, fileName: string, mime: string) => {
+    const blob = base64ToBlob(base64, mime);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Mutation Excel
+  const excelMutation = api.peserta.downloadExcel.useMutation({
+    onSuccess: (base64) => {
+      triggerDownload(
+        base64,
+        "Data_Peserta_Per_Jenjang.xlsx",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      );
+    },
+    onError: () => alert("Gagal mengunduh Excel"),
+  });
+
+  // Mutation QR ZIP
+  const qrZipMutation = api.peserta.downloadQrZip.useMutation({
+    onSuccess: (base64) => {
+      triggerDownload(base64, "QR_Code_Peserta.zip", "application/zip");
+    },
+    onError: () => alert("Gagal mengunduh QR Code"),
+  });
 
   const createBanyakPesertaMutation =
     api.peserta.createBanyakPeserta.useMutation({
@@ -332,8 +392,7 @@ export function PesertaTableActions() {
   return (
     <div className="flex flex-col items-start gap-2">
       <div className="text-muted-foreground hidden text-sm sm:block">
-        Gunakan template Excel untuk memastikan struktur kolom sesuai untuk{" "}
-        <i>bulk upload</i>.
+        Gunakan template Excel untuk <i>bulk upload</i>.
       </div>
 
       <div className="flex flex-wrap justify-end gap-2">
@@ -346,10 +405,8 @@ export function PesertaTableActions() {
         />
 
         <Button variant="outline" onClick={handleDownloadTemplate}>
-          <Download className="mr-2 h-4 w-4" />
-          Template Excel
+          <Download className="mr-2 h-4 w-4" /> Template Excel
         </Button>
-
         <Button
           variant="outline"
           className="border-primary/50 text-primary hover:bg-primary/10"
@@ -363,17 +420,68 @@ export function PesertaTableActions() {
           )}
           Import Excel
         </Button>
-
         <Button
           render={
             <Link href="/dashboard/peserta/tambah">
-              <Plus className="mr-2 h-4 w-4" />
-              Tambah Manual
+              <Plus className="mr-2 h-4 w-4" /> Tambah Manual
             </Link>
           }
           nativeButton={false}
         />
+
+        {/* Tombol Unduh Excel */}
+        <Button
+          variant="outline"
+          onClick={() => excelMutation.mutate()}
+          disabled={excelMutation.isPending}
+        >
+          {excelMutation.isPending ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <FileSpreadsheet className="mr-2 h-4 w-4" />
+          )}
+          Unduh Data Excel
+        </Button>
+
+        {/* Tombol Unduh QR ZIP */}
+        <Button
+          variant="outline"
+          onClick={() => setShowQrDialog(true)}
+          disabled={qrZipMutation.isPending}
+        >
+          {qrZipMutation.isPending ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <QrCode className="mr-2 h-4 w-4" />
+          )}
+          Unduh QR Code (ZIP)
+        </Button>
       </div>
+
+      {/* Dialog Konfirmasi QR */}
+      <AlertDialog open={showQrDialog} onOpenChange={setShowQrDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unduh QR Code Semua Peserta</AlertDialogTitle>
+            <AlertDialogDescription>
+              Anda akan mengunduh file ZIP berisi gambar QR untuk seluruh
+              peserta aktif. Struktur folder: Jenjang → Tingkat → Kelas. Proses
+              mungkin memerlukan beberapa saat.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Batal</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setShowQrDialog(false);
+                qrZipMutation.mutate();
+              }}
+            >
+              Unduh Sekarang
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
         <DialogContent className="max-w-4xl">

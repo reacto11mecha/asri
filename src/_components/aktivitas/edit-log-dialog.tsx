@@ -50,7 +50,8 @@ export function EditLogDialog({ log }: { log: LogEntry }) {
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      statusKehadiran: log.statusKehadiran === "TIDAK_HADIR" ? "ALFA" : log.statusKehadiran,
+      statusKehadiran:
+        log.statusKehadiran === "TIDAK_HADIR" ? "ALFA" : log.statusKehadiran,
       statusWaktu: log.statusWaktu,
       poinDidapat: log.poinDidapat,
       keterangan: log.keterangan ?? "",
@@ -79,7 +80,11 @@ export function EditLogDialog({ log }: { log: LogEntry }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger
-        className={buttonVariants({ variant: "ghost", size: "sm", className: "h-8 w-8 p-0" })}
+        className={buttonVariants({
+          variant: "ghost",
+          size: "sm",
+          className: "h-8 w-8 p-0",
+        })}
       >
         <Edit2 className="h-4 w-4" />
       </DialogTrigger>
@@ -96,7 +101,10 @@ export function EditLogDialog({ log }: { log: LogEntry }) {
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
                   <FieldLabel>Status Kehadiran</FieldLabel>
-                  <Select value={field.value ?? ""} onValueChange={field.onChange}>
+                  <Select
+                    value={field.value ?? ""}
+                    onValueChange={field.onChange}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Pilih status" />
                     </SelectTrigger>
@@ -108,7 +116,9 @@ export function EditLogDialog({ log }: { log: LogEntry }) {
                       <SelectItem value="LAINNYA">Lainnya</SelectItem>
                     </SelectContent>
                   </Select>
-                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                  {fieldState.invalid && (
+                    <FieldError errors={[fieldState.error]} />
+                  )}
                 </Field>
               )}
             />
@@ -123,7 +133,9 @@ export function EditLogDialog({ log }: { log: LogEntry }) {
                   <FieldLabel>Ketepatan Waktu</FieldLabel>
                   <Select
                     value={field.value ?? ""}
-                    onValueChange={(v) => field.onChange(v === "null" ? null : v)}
+                    onValueChange={(v) =>
+                      field.onChange(v === "null" ? null : v)
+                    }
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Pilih" />
@@ -133,7 +145,9 @@ export function EditLogDialog({ log }: { log: LogEntry }) {
                       <SelectItem value="TELAT">Telat</SelectItem>
                     </SelectContent>
                   </Select>
-                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                  {fieldState.invalid && (
+                    <FieldError errors={[fieldState.error]} />
+                  )}
                 </Field>
               )}
             />
@@ -154,7 +168,9 @@ export function EditLogDialog({ log }: { log: LogEntry }) {
                 <FieldDescription>
                   Mengubah poin akan menandai log sebagai "Diedit Manual".
                 </FieldDescription>
-                {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                {fieldState.invalid && (
+                  <FieldError errors={[fieldState.error]} />
+                )}
               </Field>
             )}
           />
@@ -165,8 +181,14 @@ export function EditLogDialog({ log }: { log: LogEntry }) {
             render={({ field, fieldState }) => (
               <Field data-invalid={fieldState.invalid}>
                 <FieldLabel>Keterangan</FieldLabel>
-                <Input {...field} placeholder="Opsional" aria-invalid={fieldState.invalid} />
-                {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                <Input
+                  {...field}
+                  placeholder="Opsional"
+                  aria-invalid={fieldState.invalid}
+                />
+                {fieldState.invalid && (
+                  <FieldError errors={[fieldState.error]} />
+                )}
               </Field>
             )}
           />
