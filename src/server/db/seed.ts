@@ -3,6 +3,7 @@ import {
   kategoriAbsensi,
   sesiAbsensi,
   masterPelanggaran,
+  masterJabatan,
   kelas,
   pesertaDidik,
   logAbsensi,
@@ -40,6 +41,32 @@ async function main() {
 
     const isFull =
       pilihan === "2" || pilihan === "full" || pilihan === "lengkap";
+
+    console.log("Mempersiapkan data Master Jabatan...");
+
+    const dataJabatan = [
+      {
+        id: crypto.randomUUID(),
+        namaJabatan: "Wali Asrama",
+        role: "ADMIN" as const,
+        isActive: true,
+      },
+      {
+        id: crypto.randomUUID(),
+        namaJabatan: "Wali Asuh",
+        role: "ADMIN" as const,
+        isActive: true,
+      },
+      {
+        id: crypto.randomUUID(),
+        namaJabatan: "Guru",
+        role: "STAFF" as const,
+        isActive: true,
+      },
+    ];
+
+    await db.insert(masterJabatan).values(dataJabatan).onConflictDoNothing();
+    console.log("✅ Data Master Jabatan berhasil dimasukkan.");
 
     // ==========================================
     // 1. SEEDING KATEGORI UTAMA

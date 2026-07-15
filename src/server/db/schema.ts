@@ -45,6 +45,7 @@ export const agamaEnum = pgEnum("agama", [
   "KONGHUCU",
   "LAINNYA",
 ]);
+export const roleEnum = pgEnum("role", ["ADMIN", "STAFF"]);
 
 // ==========================================
 // BETTER AUTH TABLES
@@ -57,6 +58,9 @@ export const user = pgTable("user", {
     .$defaultFn(() => false)
     .notNull(),
   accountApproved: boolean("account_approved").default(false).notNull(),
+  jabatanId: text("jabatan_id").references(() => masterJabatan.id, {
+    onDelete: "set null",
+  }),
   image: text("image"),
   createdAt: timestamp("created_at")
     .$defaultFn(() => /* @__PURE__ */ new Date())
@@ -113,6 +117,15 @@ export const verification = pgTable("verification", {
 // ==========================================
 // DOMAIN TABLES (MASTER DATA)
 // ==========================================
+export const masterJabatan = pgTable("master_jabatan", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  namaJabatan: text("nama_jabatan").notNull().unique(),
+  role: roleEnum("role").default("STAFF").notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+});
+
 export const kelas = pgTable("kelas", {
   id: text("id")
     .primaryKey()
@@ -301,10 +314,18 @@ export const logAbsensi = pgTable(
 // ==========================================
 // DRIZZLE RELATIONS (Untuk mempermudah query .with())
 // ==========================================
-export const userRelations = relations(user, ({ many }) => ({
+export const masterJabatanRelations = relations(masterJabatan, ({ many }) => ({
+  users: many(user),
+}));
+
+export const userRelations = relations(user, ({ many, one }) => ({
   account: many(account),
   session: many(session),
   anakAsuh: many(pesertaDidik),
+  jabatan: one(masterJabatan, {
+    fields: [user.jabatanId],
+    references: [masterJabatan.id],
+  }),
 }));
 
 export const accountRelations = relations(account, ({ one }) => ({

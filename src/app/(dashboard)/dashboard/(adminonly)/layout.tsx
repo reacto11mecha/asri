@@ -1,10 +1,10 @@
 import { redirect } from "next/navigation";
-import { getSession } from "~/server/better-auth/server";
 import { db } from "~/server/db";
-import { user } from "~/server/db/schema";
 import { eq } from "drizzle-orm";
+import { user } from "~/server/db/schema";
+import { getSession } from "~/server/better-auth/server";
 
-export default async function ScannerLayout({
+export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -15,11 +15,9 @@ export default async function ScannerLayout({
 
   const currentUser = await db.query.user.findFirst({
     where: eq(user.id, auth.user.id),
-    columns: {
-      accountApproved: true,
-      jabatanId: true,
-      email: true,
-      name: true,
+    columns: { accountApproved: true },
+    with: {
+      jabatan: true,
     },
   });
 
@@ -27,8 +25,12 @@ export default async function ScannerLayout({
     redirect("/login");
   }
 
-  if (!currentUser.accountApproved || !currentUser.jabatanId) {
+  if (!currentUser.accountApproved || !currentUser.jabatan) {
     redirect("/");
+  }
+
+  if (currentUser.jabatan.role !== "ADMIN") {
+    redirect("/dashboard");
   }
 
   return <>{children}</>;

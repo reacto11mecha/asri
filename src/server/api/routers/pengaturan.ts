@@ -6,8 +6,9 @@ import {
   kategoriAbsensi,
   sesiAbsensi,
   masterPelanggaran,
+  masterJabatan,
 } from "~/server/db/schema";
-import { eq, asc } from "drizzle-orm";
+import { eq, asc, not, and } from "drizzle-orm";
 
 const regex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$/;
 
@@ -21,23 +22,120 @@ const formatTime = (timeStr?: string | null) => {
 };
 
 export const pengaturanRouter = createTRPCRouter({
-  // ==========================================
-  // MANAJEMEN AKUN
-  // ==========================================
-  getAllUsers: protectedProcedure.query(async ({ ctx }) => {
-    return ctx.db.query.user.findMany({
-      orderBy: (users, { desc }) => [desc(users.createdAt)],
+  // ====================================================================
+  // A. KELOLA MASTER JABATAN (ROLE & LABEL)
+  // ====================================================================
+  getJabatans: protectedProcedure.query(async ({ ctx }) => {
+    return ctx.db.query.masterJabatan.findMany({
+      orderBy: (j, { asc }) => [asc(j.namaJabatan)],
     });
   }),
 
-  approveUser: protectedProcedure
+  createJabatan: protectedProcedure
+    .input(
+      z.object({
+        namaJabatan: z.string().min(1, "Nama Jabatan wajib diisi"),
+        role: z.enum(["ADMIN", "STAFF"]),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await ctx.db.insert(masterJabatan).values({
+        namaJabatan: input.namaJabatan,
+        role: input.role,
+      });
+    }),
+
+  updateJabatan: protectedProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        namaJabatan: z.string().min(1, "Nama Jabatan wajib diisi"),
+        role: z.enum(["ADMIN", "STAFF"]),
+        isActive: z.boolean(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await ctx.db
+        .update(masterJabatan)
+        .set({
+          namaJabatan: input.namaJabatan,
+          role: input.role,
+          isActive: input.isActive,
+        })
+        .where(eq(masterJabatan.id, input.id));
+    }),
+
+  deleteJabatan: protectedProcedure
     .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      await ctx.db.delete(masterJabatan).where(eq(masterJabatan.id, input.id));
+    }),
+
+  // ====================================================================
+  // B. MANAJEMEN PEGAWAI (APPROVAL & PENUGASAN JABATAN)
+  // ====================================================================
+
+  // 1. Ambil daftar pegawai yang baru login dan menunggu di-approve
+  getPendingUsers: protectedProcedure.query(async ({ ctx }) => {
+    return ctx.db.query.user.findMany({
+      where: eq(user.accountApproved, false),
+      orderBy: (u, { desc }) => [desc(u.createdAt)],
+    });
+  }),
+
+  // 2. Ambil daftar pegawai yang sudah di-approve (beserta nama jabatannya)
+  getApprovedUsers: protectedProcedure.query(async ({ ctx }) => {
+    return ctx.db.query.user.findMany({
+      where: and(
+        eq(user.accountApproved, true),
+        not(eq(user.id, ctx.session.user.id)),
+      ),
+      with: {
+        jabatan: true, // Menarik relasi dari masterJabatan
+      },
+      orderBy: (u, { desc }) => [desc(u.createdAt)],
+    });
+  }),
+
+  // 3. Approve pegawai baru (Berikan akses masuk & pasangkan jabatannya)
+  approveUser: protectedProcedure
+    .input(
+      z.object({
+        userId: z.string(),
+        jabatanId: z.string().min(1, "Jabatan wajib dipilih saat approve"),
+      }),
+    )
     .mutation(async ({ ctx, input }) => {
       await ctx.db
         .update(user)
-        .set({ accountApproved: true })
-        .where(eq(user.id, input.id));
-      return { success: true };
+        .set({
+          accountApproved: true,
+          jabatanId: input.jabatanId,
+        })
+        .where(eq(user.id, input.userId));
+    }),
+
+  // 4. Tolak/Hapus pegawai yang tidak dikenal
+  rejectUser: protectedProcedure
+    .input(z.object({ userId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      // Hapus permanen user dari database agar tidak membebani sistem
+      await ctx.db.delete(user).where(eq(user.id, input.userId));
+    }),
+
+  // 5. Update/Pindahkan jabatan pegawai yang sudah aktif
+  updateUserJabatan: protectedProcedure
+    .input(
+      z.object({
+        userId: z.string(),
+        jabatanId: z.string().min(1, "Jabatan wajib dipilih"),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await ctx.db
+        .update(user)
+        .set({ jabatanId: input.jabatanId })
+        .where(eq(user.id, input.userId));
     }),
 
   // ==========================================

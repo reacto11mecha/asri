@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { cn } from "~/lib/utils";
 
-export function Sidebar() {
+export function Sidebar({ role }: { role: "ADMIN" | "STAFF" }) {
   const pathname = usePathname();
 
   const mainMenus = [
@@ -22,13 +22,18 @@ export function Sidebar() {
       href: "/dashboard/aktivitas",
       icon: ScrollText,
     },
-    { name: "Rekap Laporan", href: "/dashboard/rekap", icon: FileText },
-    { name: "Data Peserta", href: "/dashboard/peserta", icon: Users },
-    {
-      name: "Pengaturan Sistem",
-      href: "/dashboard/pengaturan",
-      icon: Settings,
-    },
+
+    ...(role === "ADMIN"
+      ? [
+          { name: "Rekap Laporan", href: "/dashboard/rekap", icon: FileText },
+          { name: "Data Peserta", href: "/dashboard/peserta", icon: Users },
+          {
+            name: "Pengaturan Sistem",
+            href: "/dashboard/pengaturan",
+            icon: Settings,
+          },
+        ]
+      : []),
   ];
 
   const scannerMenu = { name: "Scanner", href: "/scanner", icon: QrCode };

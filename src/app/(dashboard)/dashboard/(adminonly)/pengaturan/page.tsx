@@ -18,23 +18,15 @@ import { KategoriFormDialog } from "~/_components/pengaturan/kategori-form-dialo
 import { SesiFormDialog } from "~/_components/pengaturan/sesi-form-dialog";
 import { PelanggaranFormDialog } from "~/_components/pengaturan/pelanggaran-form-dialog";
 import { Trash2 } from "lucide-react";
+import { PegawaiTab } from "~/_components/pengaturan/pegawai-tab";
 
 export default function PengaturanPage() {
   const utils = api.useUtils();
 
-  const { data: users, isLoading: loadingUsers } =
-    api.pengaturan.getAllUsers.useQuery();
   const { data: kategoriData, isLoading: isLoadingKategori } =
     api.pengaturan.getKategoriWithSesi.useQuery();
   const { data: pelanggaranData, isLoading: isLoadingPelanggaran } =
     api.pengaturan.getMasterPelanggaran.useQuery();
-
-  const approveUserMutation = api.pengaturan.approveUser.useMutation({
-    onSuccess: () => {
-      toast.success("Akun berhasil disetujui!");
-      utils.pengaturan.getAllUsers.invalidate();
-    },
-  });
 
   const deleteKategoriMutation = api.pengaturan.deleteKategori.useMutation({
     onSuccess: () => {
@@ -52,9 +44,6 @@ export default function PengaturanPage() {
     onError: (e) => toast.error(e.message),
   });
 
-  const unapprovedUsers = users?.filter((u) => !u.accountApproved) || [];
-  const approvedUsers = users?.filter((u) => u.accountApproved) || [];
-
   return (
     <div className="space-y-6">
       <div>
@@ -66,77 +55,10 @@ export default function PengaturanPage() {
 
       <Tabs defaultValue="kategori" className="w-full">
         <TabsList className="mb-4">
-          <TabsTrigger value="akun">Daftar Pengguna</TabsTrigger>
           <TabsTrigger value="kategori">Kategori & Sesi Rutin</TabsTrigger>
           <TabsTrigger value="pelanggaran">Master Pelanggaran</TabsTrigger>
+          <TabsTrigger value="pegawai">Daftar Pengguna</TabsTrigger>
         </TabsList>
-
-        <TabsContent value="akun" className="space-y-6">
-          <div className="rounded-md border border-yellow-200 bg-yellow-50/50 p-4 dark:bg-yellow-950/10">
-            <h2 className="mb-4 text-xl font-semibold text-yellow-800 dark:text-yellow-500">
-              Menunggu Persetujuan ({unapprovedUsers.length})
-            </h2>
-            {loadingUsers ? (
-              <p className="text-sm">Memuat data...</p>
-            ) : unapprovedUsers.length === 0 ? (
-              <p className="text-muted-foreground text-sm">
-                Tidak ada akun yang menunggu persetujuan.
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {unapprovedUsers.map((user) => (
-                  <div
-                    key={user.id}
-                    className="bg-background flex items-center justify-between rounded-lg border p-3 shadow-sm"
-                  >
-                    <div>
-                      <p className="font-medium">{user.name}</p>
-                      <p className="text-muted-foreground text-sm">
-                        {user.email}
-                      </p>
-                    </div>
-                    <Button
-                      onClick={() =>
-                        approveUserMutation.mutate({ id: user.id })
-                      }
-                      disabled={approveUserMutation.isPending}
-                      size="sm"
-                    >
-                      Setujui
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="rounded-md border p-4">
-            <h2 className="mb-4 text-xl font-semibold">
-              Pengguna Aktif ({approvedUsers.length})
-            </h2>
-            <div className="grid gap-3">
-              {approvedUsers.map((user) => (
-                <div
-                  key={user.id}
-                  className="flex items-center justify-between rounded-lg border p-3"
-                >
-                  <div>
-                    <p className="font-medium">{user.name}</p>
-                    <p className="text-muted-foreground text-sm">
-                      {user.email}
-                    </p>
-                  </div>
-                  <Badge
-                    variant="outline"
-                    className="border-green-200 bg-green-50 text-green-700"
-                  >
-                    Aktif
-                  </Badge>
-                </div>
-              ))}
-            </div>
-          </div>
-        </TabsContent>
 
         {/* TAB 1: KATEGORI & SESI */}
         <TabsContent value="kategori" className="space-y-6">
@@ -334,6 +256,9 @@ export default function PengaturanPage() {
               </Table>
             </div>
           )}
+        </TabsContent>
+        <TabsContent value="pegawai">
+          <PegawaiTab />
         </TabsContent>
       </Tabs>
     </div>

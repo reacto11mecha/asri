@@ -26,13 +26,16 @@ export default async function DashboardLayout({
   const currentUser = await db.query.user.findFirst({
     where: eq(user.id, auth.user.id),
     columns: { accountApproved: true, email: true, name: true },
+    with: {
+      jabatan: true,
+    },
   });
 
   if (!currentUser) {
     redirect("/login");
   }
 
-  if (!currentUser.accountApproved) {
+  if (!currentUser.accountApproved || !currentUser.jabatan) {
     redirect("/");
   }
 
@@ -40,7 +43,7 @@ export default async function DashboardLayout({
     <div className="bg-background flex min-h-screen w-full">
       {/* SIDEBAR DESKTOP (Sembunyi di layar kecil) */}
       <aside className="bg-muted/20 hidden w-64 flex-col border-r md:flex">
-        <Sidebar />
+        <Sidebar role={currentUser.jabatan.role} />
       </aside>
 
       {/* AREA KONTEN KANAN */}
@@ -62,10 +65,6 @@ export default async function DashboardLayout({
                 </SheetContent>
               </Sheet>
             </div>
-
-            <h2 className="hidden text-lg font-semibold sm:block">
-              Sistem Presensi
-            </h2>
           </div>
 
           {/* PROFIL KANAN ATAS */}
