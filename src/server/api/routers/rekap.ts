@@ -1,6 +1,14 @@
 import { z } from "zod";
 import { createTRPCRouter, adminProcedure } from "~/server/api/trpc";
-import { and, eq, gte, lte, isNotNull, arrayContains } from "drizzle-orm";
+import {
+  and,
+  eq,
+  gte,
+  lte,
+  isNotNull,
+  arrayContains,
+  inArray,
+} from "drizzle-orm";
 import {
   logAbsensi,
   pesertaDidik,
@@ -548,5 +556,55 @@ export const rekapRouter = createTRPCRouter({
 
       const buffer = await workbook.xlsx.writeBuffer();
       return Buffer.from(buffer).toString("base64");
+    }),
+
+  getDataPdfSesi: adminProcedure
+    .input(
+      z.object({
+        tanggal: z.string(),
+        jenjang: z.enum(["SD", "SMP", "SMA"]),
+        sesiId: z.string(),
+        kelasId: z.string().optional(),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      const sesiInfo = await ctx.db.query.sesiAbsensi.findFirst({
+        where: eq(sesiAbsensi.id, input.sesiId),
+        with: { kategori: true },
+      });
+
+      if (!sesiInfo) throw new Error("Sesi tidak ditemukan");
+
+      const studentsData = await ctx.db
+        .select({
+          id: pesertaDidik.id,
+          namaLengkap: pesertaDidik.namaLengkap,
+          tingkat: kelas.tingkat,
+          namaKelas: kelas.namaKelas,
+          statusKehadiran: logAbsensi.statusKehadiran,
+          statusWaktu: logAbsensi.statusWaktu,
+          waktuScan: logAbsensi.waktuScan,
+          keterangan: logAbsensi.keterangan,
+        })
+        .from(pesertaDidik)
+        .innerJoin(kelas, eq(pesertaDidik.kelasId, kelas.id))
+        .leftJoin(
+          logAbsensi,
+          and(
+            eq(logAbsensi.pesertaDidikId, pesertaDidik.id),
+            eq(logAbsensi.tanggal, input.tanggal),
+            eq(logAbsensi.sesiId, input.sesiId),
+          ),
+        )
+        .where(
+          and(
+            eq(kelas.jenjang, input.jenjang),
+            inArray(pesertaDidik.agama, sesiInfo.targetAgama),
+            input.kelasId ? eq(kelas.id, input.kelasId) : undefined,
+          ),
+        )
+        .orderBy(kelas.tingkat, kelas.namaKelas, pesertaDidik.namaLengkap);
+
+      return { sesiInfo, studentsData };
     }),
 });
