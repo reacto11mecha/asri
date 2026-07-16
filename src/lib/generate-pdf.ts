@@ -44,6 +44,9 @@ export async function generateLaporanSesiPdf(data: PdfDataPayload) {
   const doc = new jsPDF("p", "mm", "a4");
   const pageWidth = doc.internal.pageSize.getWidth();
 
+  const tambahanJarakDariLogo = 8;
+  const centerX = pageWidth / 2 + tambahanJarakDariLogo;
+
   doc.setTextColor(0, 0, 0);
 
   // 1. KOP SURAT
@@ -54,54 +57,80 @@ export async function generateLaporanSesiPdf(data: PdfDataPayload) {
     console.warn("Gagal memuat gambar logo, melanjutkan tanpa logo.");
   }
 
+  // Baris 1: KEMENTERIAN... (Font 16)
+  // Baseline referensi awal
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(14);
-  doc.text("KEMENTERIAN SOSIAL REPUBLIK INDONESIA", pageWidth / 2, 16, {
+  doc.setFontSize(16);
+  doc.text("KEMENTERIAN SOSIAL REPUBLIK INDONESIA", centerX, 15, {
     align: "center",
   });
 
-  doc.setFontSize(14);
+  // Baris 2: PUSAT PENDIDIKAN... (Font 12)
+  // Jarak +5.5 dari baris sebelumnya
+  doc.setFontSize(12);
   doc.text(
     "PUSAT PENDIDIKAN, PELATIHAN DAN PENGEMBANGAN PROFESI",
-    pageWidth / 2,
-    22,
+    centerX,
+    20.5,
     { align: "center" },
   );
 
-  doc.setFontSize(14);
-  doc.text(
-    "SEKOLAH RAKYAT TERINTEGRASI 1 KABUPATEN BEKASI",
-    pageWidth / 2,
-    28,
-    { align: "center" },
-  );
+  // Baris 3: SEKOLAH RAKYAT... (Font 12)
+  // Jarak +5.0 (didekatkan sedikit agar padat seperti gambar)
+  doc.setFontSize(12);
+  doc.text("SEKOLAH RAKYAT TERINTEGRASI 1 KABUPATEN BEKASI", centerX, 25.5, {
+    align: "center",
+  });
 
+  // Baris 4: Alamat atas (Font 9)
+  // Jarak +4.5 (font mengecil menjadi 9, jadi lompatan Y harus dikurangi agar tidak ada ruang kosong)
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
+  doc.setFontSize(9);
   doc.text(
-    "Alamat: Komplek Perkantoran Pemerintah Kabupaten Bekasi, Desa Sukamahi, Kecamatan Cikarang Pusat,",
-    pageWidth / 2,
-    33,
-    { align: "center" },
-  );
-  doc.text(
-    "Kabupaten Bekasi, Jawa Barat 17531 - Email: srt43kotabekasi@gmail.com",
-    pageWidth / 2,
-    37,
+    "Alamat: Komplek Perkantoran Pemerintah Kabupaten Bekasi, Desa Sukamahi, Kecamatan Cikarang",
+    centerX,
+    30,
     { align: "center" },
   );
 
-  // Garis Pembatas
+  // Baris 5: Alamat bawah / Email (Font 9, Email Biru & Underline)
+  // Memecah string menjadi dua bagian
+  const text1 = "Pusat, Kabupaten Bekasi, Jawa Barat 17531 - Email: ";
+  const textEmail = "srt43kotabekasi@gmail.com";
+
+  // Mengukur lebar masing-masing string di jsPDF
+  const w1 = doc.getTextWidth(text1);
+  const wEmail = doc.getTextWidth(textEmail);
+  const totalWidth = w1 + wEmail;
+
+  // Menghitung koordinat X awal agar total gabungan teks ini tepat berada di tengah (centerX)
+  const startX = centerX - totalWidth / 2;
+
+  // Cetak teks bagian pertama (Hitam)
+  doc.setTextColor(0, 0, 0);
+  doc.text(text1, startX, 34);
+
+  // Cetak teks bagian email (Biru Link)
+  doc.setTextColor(17, 85, 204); // Warna biru khas hyperlink Google
+  doc.text(textEmail, startX + w1, 34);
+
+  // Cetak garis bawah (Underline) untuk email
+  doc.setDrawColor(17, 85, 204);
+  doc.setLineWidth(0.2); // Garis tipis
+  doc.line(startX + w1, 34.5, startX + totalWidth, 34.5); // Y diset 34.5 agar berada tepat di bawah teks
+
+  // Garis Pembatas (Dikembalikan ke warna Hitam)
   doc.setDrawColor(0, 0, 0);
   doc.setLineWidth(1.0);
-  doc.line(15, 42, pageWidth - 15, 42);
-  doc.setLineWidth(0.3);
-  doc.line(15, 43, pageWidth - 15, 43);
+  doc.line(15, 37, pageWidth - 15, 37);
+
+  // (PENTING) Kembalikan teks ke warna hitam pekat untuk tabel di bawahnya
+  doc.setTextColor(0, 0, 0);
 
   // 2. METADATA LAPORAN
   doc.setFont("helvetica", "bold");
   doc.setFontSize(12);
-  doc.text("LAPORAN PRESENSI KEGIATAN SISWA", pageWidth / 2, 53, {
+  doc.text("LAPORAN PRESENSI KEGIATAN SISWA", pageWidth / 2, 45, {
     align: "center",
   });
 
@@ -113,7 +142,7 @@ export async function generateLaporanSesiPdf(data: PdfDataPayload) {
   doc.text(
     `Target: ${data.targetLabel}  |  Kegiatan: ${data.sesiInfo.namaSesi} (${data.sesiInfo.kategori.namaKategori})  |  Tanggal Aktivitas: ${formattedDate}`,
     pageWidth / 2,
-    59,
+    51,
     { align: "center" },
   );
 
@@ -168,7 +197,7 @@ export async function generateLaporanSesiPdf(data: PdfDataPayload) {
 
   // 4. HEADER TABEL DISESUAIKAN (6 kolom)
   autoTable(doc, {
-    startY: 65,
+    startY: 56,
     head: [
       ["No", "Nama Peserta", "Kelas", "Jam Absen", "Status", "Keterangan"],
     ],
