@@ -1,10 +1,9 @@
-// src/app/(dashboard)/dashboard/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { format } from "date-fns";
 import { id } from "date-fns/locale";
-import { api } from "~/trpc/react";
+import { api, type RouterOutputs } from "~/trpc/react";
 import {
   Card,
   CardContent,
@@ -35,6 +34,11 @@ import {
   CalendarDays,
   Medal,
 } from "lucide-react";
+
+// ---------- tipe dari router insight ----------
+type SesiBermasalahItem = RouterOutputs["insight"]["getEvaluasiSesi"][number];
+type PelanggaranItem = RouterOutputs["insight"]["getDaftarPelanggaran"][number];
+type WallOfFameItem = RouterOutputs["insight"]["getWallOfFame"][number];
 
 const getStatusBadge = (status: string, isMissing?: boolean) => {
   if (isMissing)
@@ -72,7 +76,7 @@ const getStatusBadge = (status: string, isMissing?: boolean) => {
           SAKIT
         </Badge>
       );
-    case "LAINNYA": // ---> TAMBAHAN BARU
+    case "LAINNYA":
       return (
         <Badge
           variant="outline"
@@ -91,20 +95,17 @@ const getStatusBadge = (status: string, isMissing?: boolean) => {
 };
 
 export default function DashboardInsightPage() {
-  // 1. STATE UNTUK FILTER (Cascading)
   const [tanggal, setTanggal] = useState<string>(
     format(new Date(), "yyyy-MM-dd"),
   );
-  const [jenjang, setJenjang] = useState<"SD" | "SMP" | "SMA">("SMP"); // Default SMP
-  const [tingkat, setTingkat] = useState<string>(""); // Kosong = Semua
-  const [kelasId, setKelasId] = useState<string>(""); // Kosong = Semua
+  const [jenjang, setJenjang] = useState<"SD" | "SMP" | "SMA">("SMP");
+  const [tingkat, setTingkat] = useState<string>("");
+  const [kelasId, setKelasId] = useState<string>("");
 
-  // 2. QUERY DATA
   const { data: filterOptions } = api.insight.getFilterOptions.useQuery({
     jenjang,
   });
 
-  // Filter payload
   const queryFilter = {
     tanggal,
     jenjang,
@@ -121,30 +122,35 @@ export default function DashboardInsightPage() {
   const { data: wallOfFame, isLoading: loadingWof } =
     api.insight.getWallOfFame.useQuery({ ...queryFilter, limit: 5 });
 
-  // 3. EFEK SAMPING (Reset child filter jika parent filter diubah)
-  useEffect(() => {
+  // ---------- reset filter langsung di handler (tidak pakai useEffect) ----------
+  const handleJenjangChange = (val: string | null) => {
+    if (!val) return;
+
+    setJenjang(val as "SD" | "SMP" | "SMA");
     setTingkat("");
     setKelasId("");
-  }, [jenjang]);
+  };
 
-  useEffect(() => {
+  const handleTingkatChange = (val: string | null) => {
+    setTingkat(val === "SEMUA" ? "" : (val ?? ""));
     setKelasId("");
-  }, [tingkat]);
+  };
 
-  // Kalkulasi Persentase untuk Radar
+  const handleKelasChange = (val: string | null) => {
+    setKelasId(val === "SEMUA" ? "" : (val ?? ""));
+  };
+
   const total = stats?.totalAktivitas || 0;
   const persenTepat =
     total > 0 ? Math.round((stats!.tepatWaktu / total) * 100) : 0;
   const persenTelat = total > 0 ? Math.round((stats!.telat / total) * 100) : 0;
   const persenAlfa = total > 0 ? Math.round((stats!.alfa / total) * 100) : 0;
-
-  // ---> UBAH NAMA VARIABEL DAN PROPERTI OBJEK STATS
   const persenSakitIzinLainnya =
     total > 0 ? Math.round((stats!.sakitIzinLainnya / total) * 100) : 0;
+  const selectedKelas = filterOptions?.kelasData.find((k) => k.id === kelasId);
 
   return (
     <div className="space-y-8 pb-10">
-      {/* HEADER & FILTER BAR */}
       <div className="bg-card flex flex-col items-start justify-between gap-4 rounded-xl border p-6 shadow-sm md:flex-row md:items-end">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">
@@ -166,7 +172,7 @@ export default function DashboardInsightPage() {
             />
           </div>
 
-          <Select value={jenjang} onValueChange={(val: any) => setJenjang(val)}>
+          <Select value={jenjang} onValueChange={handleJenjangChange}>
             <SelectTrigger className="w-[100px]">
               <SelectValue />
             </SelectTrigger>
@@ -179,9 +185,7 @@ export default function DashboardInsightPage() {
 
           <Select
             value={tingkat || "SEMUA"}
-            onValueChange={(val) =>
-              setKelasId(val === "SEMUA" ? "" : (val ?? ""))
-            }
+            onValueChange={handleTingkatChange}
           >
             <SelectTrigger className="w-[120px]">
               <SelectValue placeholder="Semua Tingkat" />
@@ -198,13 +202,15 @@ export default function DashboardInsightPage() {
 
           <Select
             value={kelasId || "SEMUA"}
-            onValueChange={(val) =>
-              setKelasId(val === "SEMUA" ? "" : (val ?? ""))
-            }
+            onValueChange={handleKelasChange}
             disabled={!tingkat}
           >
             <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="Semua Kelas" />
+              <SelectValue placeholder="Semua Kelas">
+                {selectedKelas
+                  ? `${selectedKelas.tingkat} ${selectedKelas.namaKelas}`
+                  : "Semua Kelas"}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="SEMUA">Semua Kelas</SelectItem>
@@ -220,7 +226,7 @@ export default function DashboardInsightPage() {
         </div>
       </div>
 
-      {/* 1. RADAR STATISTIK HARI INI */}
+      {/* RADAR STATISTIK */}
       <Card className="border-t-primary border-t-4 shadow-md">
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2 text-xl">
@@ -240,31 +246,29 @@ export default function DashboardInsightPage() {
             </p>
           ) : (
             <div className="mt-4 space-y-4">
-              {/* Progress Bar Gabungan */}
               <div className="flex h-8 w-full overflow-hidden rounded-full shadow-inner">
                 <div
                   style={{ width: `${persenTepat}%` }}
                   className="bg-emerald-500 transition-all duration-500"
                   title="Tepat Waktu"
-                ></div>
+                />
                 <div
                   style={{ width: `${persenTelat}%` }}
                   className="bg-amber-400 transition-all duration-500"
                   title="Telat"
-                ></div>
+                />
                 <div
-                  style={{ width: `${persenSakitIzinLainnya}%` }} // ---> DIUBAH
+                  style={{ width: `${persenSakitIzinLainnya}%` }}
                   className="bg-blue-400 transition-all duration-500"
                   title="Sakit/Izin/Lainnya"
-                ></div>
+                />
                 <div
                   style={{ width: `${persenAlfa}%` }}
                   className="bg-rose-500 transition-all duration-500"
                   title="Alfa"
-                ></div>
+                />
               </div>
 
-              {/* Legend / Keterangan */}
               <div className="grid grid-cols-2 gap-4 text-center md:grid-cols-4">
                 <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-3">
                   <p className="mb-1 text-sm font-medium text-emerald-700">
@@ -288,7 +292,6 @@ export default function DashboardInsightPage() {
                     </span>
                   </p>
                 </div>
-                {/* ---> KOTAK LEGENDA SAKIT/IZIN DIUBAH */}
                 <div className="rounded-lg border border-blue-100 bg-blue-50 p-3">
                   <p className="mb-1 text-sm font-medium text-blue-700">
                     Sakit/Izin/Lainnya
@@ -315,9 +318,8 @@ export default function DashboardInsightPage() {
         </CardContent>
       </Card>
 
-      {/* 2. SOROTAN KEDISIPLINAN (ACCORDION) & PELANGGARAN */}
+      {/* EVALUASI & PELANGGARAN */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Kolom Kiri: Sesi Rutin Bermasalah */}
         <Card className="shadow-md">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
@@ -347,7 +349,7 @@ export default function DashboardInsightPage() {
               </div>
             ) : (
               <Accordion multiple className="w-full">
-                {sesiBermasalah?.map((grupSesi: any) => (
+                {sesiBermasalah?.map((grupSesi: SesiBermasalahItem) => (
                   <AccordionItem
                     key={grupSesi.sesiDetail.id}
                     value={grupSesi.sesiDetail.id}
@@ -375,7 +377,7 @@ export default function DashboardInsightPage() {
                     </AccordionTrigger>
                     <AccordionContent className="px-3 pb-4">
                       <div className="mt-2 space-y-2">
-                        {grupSesi.siswaBermasalah.map((siswa: any) => (
+                        {grupSesi.siswaBermasalah.map((siswa) => (
                           <div
                             key={siswa.logId}
                             className="bg-background flex items-center justify-between rounded-md border p-3 shadow-sm"
@@ -412,7 +414,6 @@ export default function DashboardInsightPage() {
           </CardContent>
         </Card>
 
-        {/* Kolom Kanan: Pelanggaran Manual */}
         <Card className="border-red-100 bg-red-50/10 shadow-md">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg text-red-700">
@@ -433,7 +434,7 @@ export default function DashboardInsightPage() {
               </p>
             ) : (
               <div className="space-y-3">
-                {pelanggaran?.map((p: any) => (
+                {pelanggaran?.map((p: PelanggaranItem) => (
                   <div
                     key={p.logId}
                     className="bg-background flex flex-col gap-2 rounded-lg border border-red-100 p-4 shadow-sm"
@@ -468,7 +469,7 @@ export default function DashboardInsightPage() {
                       </div>
                       {p.keterangan && (
                         <p className="mt-1 text-xs text-red-700/80 italic">
-                          "{p.keterangan}"
+                          {`"${p.keterangan}"`}
                         </p>
                       )}
                     </div>
@@ -480,7 +481,7 @@ export default function DashboardInsightPage() {
         </Card>
       </div>
 
-      {/* 3. WALL OF FAME (Ditaruh di akhir sebagai Sandwich Method) */}
+      {/* WALL OF FAME */}
       <Card className="border-indigo-100 bg-gradient-to-br from-indigo-50 to-blue-50 shadow-md">
         <CardHeader className="pb-2 text-center">
           <div className="mx-auto mb-2 flex h-16 w-16 items-center justify-center rounded-full border border-yellow-200 bg-yellow-100 shadow-sm">
@@ -504,12 +505,11 @@ export default function DashboardInsightPage() {
             </p>
           ) : (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
-              {wallOfFame?.map((siswa: any, index: number) => (
+              {wallOfFame?.map((siswa: WallOfFameItem, index: number) => (
                 <div
                   key={siswa.pesertaId}
                   className="relative flex transform flex-col items-center rounded-xl border border-indigo-100 bg-white p-5 text-center shadow-sm transition-transform hover:-translate-y-1"
                 >
-                  {/* Badge Juara */}
                   <div
                     className={`absolute -top-3 -right-2 flex h-8 w-8 items-center justify-center rounded-full border-2 border-white font-bold text-white shadow-md ${index === 0 ? "bg-yellow-400" : index === 1 ? "bg-slate-300" : index === 2 ? "bg-amber-600" : "bg-indigo-300"}`}
                   >

@@ -2,7 +2,7 @@
 "use client";
 
 import { useState } from "react";
-import { api } from "~/trpc/react";
+import { api, type RouterOutputs } from "~/trpc/react";
 import { format } from "date-fns";
 import { id as localeId } from "date-fns/locale";
 import { toast } from "sonner";
@@ -42,6 +42,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
+
+// --- tipe untuk user yang sedang diproses ---
+type PendingUser = RouterOutputs["pengaturan"]["getPendingUsers"][number];
+type ApprovedUser = RouterOutputs["pengaturan"]["getApprovedUsers"][number];
+type SelectedUser = PendingUser | ApprovedUser | null;
 
 export function PegawaiTab() {
   const utils = api.useUtils();
@@ -100,7 +105,7 @@ export function PegawaiTab() {
   });
 
   const [openApprove, setOpenApprove] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [selectedUser, setSelectedUser] = useState<SelectedUser>(null);
   const [selectedJabatanId, setSelectedJabatanId] = useState("");
 
   const [openEditPegawai, setOpenEditPegawai] = useState(false);
@@ -108,6 +113,7 @@ export function PegawaiTab() {
   // HANDLERS
   const handleApprove = (e: React.SubmitEvent) => {
     e.preventDefault();
+    if (!selectedUser) return;
     if (!selectedJabatanId)
       return toast.error("Silakan pilih jabatan terlebih dahulu");
     approveUser.mutate({
@@ -118,6 +124,7 @@ export function PegawaiTab() {
 
   const handleUpdateJabatanUser = (e: React.SubmitEvent) => {
     e.preventDefault();
+    if (!selectedUser) return;
     if (!selectedJabatanId) return toast.error("Silakan pilih jabatan");
     updateJabatanUser.mutate({
       userId: selectedUser.id,
@@ -411,11 +418,14 @@ export function PegawaiTab() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="ADMIN">
+                    <SelectItem value="SUPERADMIN">
                       ADMIN (Akses Penuh ke Pengaturan & Rekap)
                     </SelectItem>
                     <SelectItem value="STAFF">
-                      STAFF (Hanya Akses Scanner & Input Manual)
+                      STAFF (Bisa akses semua sistem kecuali pengaturan)
+                    </SelectItem>
+                    <SelectItem value="SUPPORTER">
+                      SUPPORTER (Hanya akses scanner dan aktivitas)
                     </SelectItem>
                   </SelectContent>
                 </Select>

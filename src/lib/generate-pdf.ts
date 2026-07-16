@@ -143,6 +143,8 @@ export async function generateLaporanSesiPdf(data: PdfDataPayload) {
     let statusDisplay = student.statusKehadiran || "ALFA";
     if (statusDisplay === "HADIR" && student.statusWaktu === "TELAT") {
       statusDisplay = "TELAT";
+    } else if (statusDisplay === "TIDAK_HADIR") {
+      statusDisplay = "ALFA";
     }
 
     let jamAbsenDisplay = "-";
@@ -195,12 +197,13 @@ export async function generateLaporanSesiPdf(data: PdfDataPayload) {
   });
 
   // 5. BLOK PENGESAHAN
-  const finalY =
+  let finalY =
     (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable
       .finalY + 15;
 
   if (finalY > 240) {
     doc.addPage();
+    finalY = 30;
   }
 
   const signX = pageWidth - 75;
