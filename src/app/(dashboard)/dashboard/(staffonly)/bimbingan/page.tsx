@@ -20,13 +20,7 @@ import {
 } from "~/components/ui/select";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "~/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "~/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { AlertCircle, Eye, Plus, FolderOpen } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "~/components/ui/alert";
@@ -71,12 +65,12 @@ export default function BimbinganPage() {
         {/* ========================================== */}
         {/* TAB 1: MONITORING PERKEMBANGAN             */}
         {/* ========================================== */}
-        <TabsContent value="monitoring" className="m-0 space-y-6">
+        <TabsContent value="monitoring" className="space-y-6 m-0">
           {/* --- BAGIAN 1: INSIGHT KRITIS (EARLY WARNING SYSTEM) --- */}
           {monitoringData && monitoringData.insightKritis.length > 0 && (
             <Card className="border-destructive/50 bg-destructive/10">
               <CardHeader className="pb-3">
-                <CardTitle className="text-destructive flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2 text-destructive">
                   <AlertCircle className="h-5 w-5" />
                   Perhatian Khusus (Bulan Ini)
                 </CardTitle>
@@ -98,11 +92,9 @@ export default function BimbinganPage() {
                         asChild
                         size="sm"
                         variant="outline"
-                        className="border-destructive text-destructive hover:bg-destructive h-7 hover:text-white"
+                        className="h-7 border-destructive text-destructive hover:bg-destructive hover:text-white"
                       >
-                        <Link
-                          href={`/dashboard/bimbingan/monitor/${insight.pesertaDidikId}`}
-                        >
+                        <Link href={`/dashboard/bimbingan/monitor/${insight.pesertaDidikId}`}>
                           Tindak Lanjuti
                         </Link>
                       </Button>
@@ -160,9 +152,7 @@ export default function BimbinganPage() {
                       <TableHead>Nama Peserta</TableHead>
                       <TableHead>Kelas</TableHead>
                       <TableHead>Status Evaluasi</TableHead>
-                      <TableHead className="text-center">
-                        Total Skor Terakhir
-                      </TableHead>
+                      <TableHead className="text-center">Total Skor Terakhir</TableHead>
                       <TableHead className="text-center">Periode</TableHead>
                       <TableHead className="text-right">Aksi</TableHead>
                     </TableRow>
@@ -170,22 +160,20 @@ export default function BimbinganPage() {
                   <TableBody>
                     {isLoadingMonitoring ? (
                       <TableRow>
-                        <TableCell colSpan={6} className="h-24 text-center">
+                        <TableCell colSpan={6} className="text-center h-24">
                           Memuat data...
                         </TableCell>
                       </TableRow>
                     ) : monitoringData?.tabelData.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={6} className="h-24 text-center">
+                        <TableCell colSpan={6} className="text-center h-24">
                           Tidak ada data siswa ditemukan.
                         </TableCell>
                       </TableRow>
                     ) : (
                       monitoringData?.tabelData.map((row) => (
                         <TableRow key={row.id}>
-                          <TableCell className="font-medium">
-                            {row.namaLengkap}
-                          </TableCell>
+                          <TableCell className="font-medium">{row.namaLengkap}</TableCell>
                           <TableCell>{row.kelas}</TableCell>
                           <TableCell>
                             <Badge
@@ -210,19 +198,12 @@ export default function BimbinganPage() {
                             {row.periodeTerakhir}
                           </TableCell>
                           <TableCell className="text-right">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              render={
-                                <Link
-                                  href={`/dashboard/bimbingan/monitor/${row.id}`}
-                                >
-                                  <Eye className="mr-2 h-4 w-4" />
-                                  Detail
-                                </Link>
-                              }
-                              nativeButton={false}
-                            />
+                            <Button size="sm" variant="ghost" render={
+                              <Link href={`/dashboard/bimbingan/monitor/${row.id}`}>
+                                <Eye className="mr-2 h-4 w-4" />
+                                Detail
+                              </Link>
+                            } nativeButton={false} />
                           </TableCell>
                         </TableRow>
                       ))
@@ -239,12 +220,10 @@ export default function BimbinganPage() {
         {/* ========================================== */}
         <TabsContent value="kasus" className="m-0">
           <Card>
-            <CardHeader className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+            <CardHeader className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
               <div>
                 <CardTitle>Daftar Penanganan Kasus</CardTitle>
-                <CardDescription>
-                  Catatan penanganan kasus anak di sekolah rakyat.
-                </CardDescription>
+                <CardDescription>Catatan penanganan kasus anak di sekolah rakyat.</CardDescription>
               </div>
               <Button asChild>
                 <Link href="/dashboard/bimbingan/kasus/tambah">
@@ -268,59 +247,45 @@ export default function BimbinganPage() {
                   <TableBody>
                     {isLoadingKasus ? (
                       <TableRow>
-                        <TableCell colSpan={6} className="h-24 text-center">
+                        <TableCell colSpan={6} className="text-center h-24">
                           Memuat data kasus...
                         </TableCell>
                       </TableRow>
                     ) : kasusData?.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={6} className="h-24 text-center">
+                        <TableCell colSpan={6} className="text-center h-24">
                           Belum ada kasus yang tercatat.
                         </TableCell>
                       </TableRow>
                     ) : (
                       kasusData?.map((kasus) => (
                         <TableRow key={kasus.id}>
-                          <TableCell className="text-muted-foreground whitespace-nowrap">
-                            {format(
-                              new Date(kasus.tanggalBuka),
-                              "dd MMM yyyy",
-                              { locale: localeId },
-                            )}
+                          <TableCell className="whitespace-nowrap text-muted-foreground">
+                            {format(new Date(kasus.tanggalBuka), "dd MMM yyyy", { locale: localeId })}
                           </TableCell>
                           <TableCell className="font-medium">
                             {kasus.pesertaDidik.namaLengkap}
-                            <div className="text-muted-foreground text-xs font-normal">
-                              Kelas {kasus.pesertaDidik.kelas.tingkat}{" "}
-                              {kasus.pesertaDidik.kelas.namaKelas}
+                            <div className="text-xs text-muted-foreground font-normal">
+                              Kelas {kasus.pesertaDidik.kelas.tingkat} {kasus.pesertaDidik.kelas.namaKelas}
                             </div>
                           </TableCell>
                           <TableCell className="max-w-[200px] truncate">
                             {kasus.masalahUtama || "-"}
                           </TableCell>
                           <TableCell>
-                            {kasus.pesertaDidik.waliAsuh?.name ||
-                              "Belum Ditugaskan"}
+                            {kasus.pesertaDidik.waliAsuh?.name || "Belum Ditugaskan"}
                           </TableCell>
                           <TableCell>
                             <Badge
-                              variant={
-                                kasus.tanggalTutup ? "secondary" : "destructive"
-                              }
-                              className={
-                                kasus.tanggalTutup
-                                  ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-100"
-                                  : ""
-                              }
+                              variant={kasus.tanggalTutup ? "secondary" : "destructive"}
+                              className={kasus.tanggalTutup ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-100" : ""}
                             >
                               {kasus.tanggalTutup ? "Selesai" : "Aktif"}
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right">
                             <Button asChild size="sm" variant="ghost">
-                              <Link
-                                href={`/dashboard/bimbingan/kasus/${kasus.id}`}
-                              >
+                              <Link href={`/dashboard/bimbingan/kasus/${kasus.id}`}>
                                 <FolderOpen className="mr-2 h-4 w-4" />
                                 Kelola
                               </Link>
