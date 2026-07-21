@@ -113,7 +113,13 @@ export function PesertaTableActions() {
     api.peserta.deleteBanyakPeserta.useMutation({
       onSuccess: (data) => {
         utils.peserta.getAll.invalidate();
+
         setShowBulkDeleteDialog(false);
+        setDelJenjang("SD");
+        setDelTingkat("");
+        setDelKelasId(undefined);
+        setDelKonfirmasi("");
+
         toast.success(`Berhasil menghapus ${data.deletedCount} peserta.`);
       },
       onError: (error) =>
@@ -164,15 +170,17 @@ export function PesertaTableActions() {
 
   const createBanyakPesertaMutation =
     api.peserta.createBanyakPeserta.useMutation({
-      onSuccess: () => {
+      onSuccess: (data) => {
         utils.peserta.getAll.invalidate();
         setIsPreviewOpen(false);
         setPreviewData([]);
-        alert("Berhasil mengunggah data peserta!");
+        toast.success(
+          `Berhasil! ${data.inserted} data baru ditambahkan, ${data.updated} data diperbarui.`,
+        );
         if (fileInputRef.current) fileInputRef.current.value = "";
       },
       onError: (error) =>
-        alert("Gagal mengunggah data massal: " + error.message),
+        toast.error("Gagal mengunggah data", { description: error.message }),
     });
 
   const handleDownloadTemplate = async () => {

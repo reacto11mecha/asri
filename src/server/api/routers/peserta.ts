@@ -159,28 +159,117 @@ export const pesertaRouter = createTRPCRouter({
       const parseEmptyString = (val?: string) =>
         val && val.trim() !== "" ? val : undefined;
 
-      const valuesToInsert = input.map((item) => ({
-        ...item,
+      const items = input.filter((item) => item.nipd);
+      if (items.length === 0) return { inserted: 0, updated: 0 };
 
-        nisn: parseEmptyString(item.nisn),
-        nik: parseEmptyString(item.nik),
-        noKk: parseEmptyString(item.noKk),
-        nikIbu: parseEmptyString(item.nikIbu),
-        nikAyah: parseEmptyString(item.nikAyah),
+      const nipdList = items.map((item) => item.nipd!);
 
-        tanggalLahir: parseDate(item.tanggalLahir),
-        tanggalLahirIbu: parseDate(item.tanggalLahirIbu),
-        tanggalLahirAyah: parseDate(item.tanggalLahirAyah),
-        waliAsuhId:
-          item.waliAsuhId && item.waliAsuhId !== "unassigned"
-            ? item.waliAsuhId
-            : null,
-      }));
+      // 1. Cari NIPD yang sudah ada
+      const existingNipd = await ctx.db
+        .select({ nipd: pesertaDidik.nipd })
+        .from(pesertaDidik)
+        .where(inArray(pesertaDidik.nipd, nipdList));
+      const existingSet = new Set(existingNipd.map((e) => e.nipd));
 
-      return await ctx.db
-        .insert(pesertaDidik)
-        .values(valuesToInsert)
-        .onConflictDoNothing({ target: pesertaDidik.nipd });
+      // 2. Pisahkan data baru dan data update
+      const toInsert = items.filter((item) => !existingSet.has(item.nipd!));
+      const toUpdate = items.filter((item) => existingSet.has(item.nipd!));
+
+      let inserted = 0;
+      let updated = 0;
+
+      // 3. Gunakan transaksi agar atomik
+      await ctx.db.transaction(async (tx) => {
+        // Insert data baru
+        if (toInsert.length > 0) {
+          const insertValues = toInsert.map((item) => ({
+            nipd: item.nipd!,
+            namaLengkap: item.namaLengkap!,
+            kelasId: item.kelasId!,
+            agama: item.agama,
+            nisn: parseEmptyString(item.nisn),
+            jenisKelamin: parseEmptyString(item.jenisKelamin),
+            tempatLahir: parseEmptyString(item.tempatLahir),
+            tanggalLahir: parseDate(item.tanggalLahir),
+            anakKe: parseEmptyString(item.anakKe),
+            noAkte: parseEmptyString(item.noAkte),
+            nik: parseEmptyString(item.nik),
+            noKk: parseEmptyString(item.noKk),
+            alamat: parseEmptyString(item.alamat),
+            rt: parseEmptyString(item.rt),
+            rw: parseEmptyString(item.rw),
+            kelurahan: parseEmptyString(item.kelurahan),
+            kecamatan: parseEmptyString(item.kecamatan),
+            kodePos: parseEmptyString(item.kodePos),
+            noTelp: parseEmptyString(item.noTelp),
+            sekolahAsal: parseEmptyString(item.sekolahAsal),
+            namaIbu: parseEmptyString(item.namaIbu),
+            tempatLahirIbu: parseEmptyString(item.tempatLahirIbu),
+            tanggalLahirIbu: parseDate(item.tanggalLahirIbu),
+            pendidikanIbu: parseEmptyString(item.pendidikanIbu),
+            pekerjaanIbu: parseEmptyString(item.pekerjaanIbu),
+            penghasilanIbu: parseEmptyString(item.penghasilanIbu),
+            nikIbu: parseEmptyString(item.nikIbu),
+            namaAyah: parseEmptyString(item.namaAyah),
+            tempatLahirAyah: parseEmptyString(item.tempatLahirAyah),
+            tanggalLahirAyah: parseDate(item.tanggalLahirAyah),
+            pendidikanAyah: parseEmptyString(item.pendidikanAyah),
+            pekerjaanAyah: parseEmptyString(item.pekerjaanAyah),
+            penghasilanAyah: parseEmptyString(item.penghasilanAyah),
+            nikAyah: parseEmptyString(item.nikAyah),
+          }));
+          await tx.insert(pesertaDidik).values(insertValues);
+          inserted = insertValues.length;
+        }
+
+        // Update data yang sudah ada
+        if (toUpdate.length > 0) {
+          for (const item of toUpdate) {
+            await tx
+              .update(pesertaDidik)
+              .set({
+                namaLengkap: item.namaLengkap!,
+                kelasId: item.kelasId!,
+                agama: item.agama,
+                nisn: parseEmptyString(item.nisn),
+                jenisKelamin: parseEmptyString(item.jenisKelamin),
+                tempatLahir: parseEmptyString(item.tempatLahir),
+                tanggalLahir: parseDate(item.tanggalLahir),
+                anakKe: parseEmptyString(item.anakKe),
+                noAkte: parseEmptyString(item.noAkte),
+                nik: parseEmptyString(item.nik),
+                noKk: parseEmptyString(item.noKk),
+                alamat: parseEmptyString(item.alamat),
+                rt: parseEmptyString(item.rt),
+                rw: parseEmptyString(item.rw),
+                kelurahan: parseEmptyString(item.kelurahan),
+                kecamatan: parseEmptyString(item.kecamatan),
+                kodePos: parseEmptyString(item.kodePos),
+                noTelp: parseEmptyString(item.noTelp),
+                sekolahAsal: parseEmptyString(item.sekolahAsal),
+                namaIbu: parseEmptyString(item.namaIbu),
+                tempatLahirIbu: parseEmptyString(item.tempatLahirIbu),
+                tanggalLahirIbu: parseDate(item.tanggalLahirIbu),
+                pendidikanIbu: parseEmptyString(item.pendidikanIbu),
+                pekerjaanIbu: parseEmptyString(item.pekerjaanIbu),
+                penghasilanIbu: parseEmptyString(item.penghasilanIbu),
+                nikIbu: parseEmptyString(item.nikIbu),
+                namaAyah: parseEmptyString(item.namaAyah),
+                tempatLahirAyah: parseEmptyString(item.tempatLahirAyah),
+                tanggalLahirAyah: parseDate(item.tanggalLahirAyah),
+                pendidikanAyah: parseEmptyString(item.pendidikanAyah),
+                pekerjaanAyah: parseEmptyString(item.pekerjaanAyah),
+                penghasilanAyah: parseEmptyString(item.penghasilanAyah),
+                nikAyah: parseEmptyString(item.nikAyah),
+                // waliAsuhId tidak diupdate
+              })
+              .where(eq(pesertaDidik.nipd, item.nipd!));
+            updated++;
+          }
+        }
+      });
+
+      return { inserted, updated };
     }),
 
   updatePeserta: staffProcedure
