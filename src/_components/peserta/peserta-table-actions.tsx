@@ -9,6 +9,7 @@ import {
   Upload,
   Download,
   Loader2,
+  Trash2,
   FileSpreadsheet,
   QrCode,
 } from "lucide-react";
@@ -33,6 +34,13 @@ import {
   DialogFooter,
 } from "~/components/ui/dialog";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
+import {
   Table,
   TableBody,
   TableCell,
@@ -40,6 +48,7 @@ import {
   TableHeader,
   TableRow,
 } from "~/components/ui/table";
+import { toast } from "sonner";
 
 // ⬇️ URUTAN KOLOM BARU: agama dipindah tepat setelah kelasId
 const columnOrder = [
@@ -88,7 +97,28 @@ export function PesertaTableActions() {
   const [isParsing, setIsParsing] = useState(false);
   const [showQrDialog, setShowQrDialog] = useState(false);
 
+  const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
+  const [delJenjang, setDelJenjang] = useState("SD");
+  const [delTingkat, setDelTingkat] = useState("");
+  const [delKelasId, setDelKelasId] = useState<string | undefined>(undefined);
+  const [delKonfirmasi, setDelKonfirmasi] = useState("");
+
   const { data: daftarKelas = [] } = api.peserta.getAllKelas.useQuery();
+
+  const selectedBulkDeleteKelasLabel = delKelasId
+    ? (daftarKelas.find((k) => k.id === delKelasId)?.namaKelas ?? "Pilih Kelas")
+    : "Semua";
+
+  const deleteBanyakPesertaMutation =
+    api.peserta.deleteBanyakPeserta.useMutation({
+      onSuccess: (data) => {
+        utils.peserta.getAll.invalidate();
+        setShowBulkDeleteDialog(false);
+        toast.success(`Berhasil menghapus ${data.deletedCount} peserta.`);
+      },
+      onError: (error) =>
+        toast.error("Gagal menghapus peserta", { description: error.message }),
+    });
 
   const base64ToBlob = (base64: string, mime: string) => {
     const byteCharacters = atob(base64);
@@ -456,6 +486,13 @@ export function PesertaTableActions() {
           )}
           Unduh QR Code (ZIP)
         </Button>
+        <Button
+          variant="outline"
+          className="border-red-500 text-red-600 hover:bg-red-50"
+          onClick={() => setShowBulkDeleteDialog(true)}
+        >
+          <Trash2 className="mr-2 h-4 w-4" /> Hapus Massal
+        </Button>
       </div>
 
       {/* Dialog Konfirmasi QR */}
@@ -546,6 +583,162 @@ export function PesertaTableActions() {
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               )}
               Unggah {previewData.length} Data Sekarang
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={showBulkDeleteDialog}
+        onOpenChange={(open) => {
+          setShowBulkDeleteDialog(open);
+          if (!open) {
+            // Reset state saat dialog ditutup
+            setDelJenjang("SD");
+            setDelTingkat("");
+            setDelKelasId(undefined);
+            setDelKonfirmasi("");
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Hapus Massal Peserta</DialogTitle>
+            <DialogDescription>
+              Pilih kriteria peserta yang akan dihapus permanen. Data yang
+              hilang akibat operasi ini tidak dapat dikembalikan lagi.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-2">
+            {/* Jenjang */}
+            <div>
+              <label className="mb-1 block text-sm font-medium">
+                Jenjang *
+              </label>
+              <Select
+                value={delJenjang}
+                onValueChange={(v) => {
+                  if (v) setDelJenjang(v);
+                  setDelTingkat("");
+                  setDelKelasId(undefined);
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="SD">SD</SelectItem>
+                  <SelectItem value="SMP">SMP</SelectItem>
+                  <SelectItem value="SMA">SMA</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Tingkat */}
+            <div>
+              <label className="mb-1 block text-sm font-medium">
+                Tingkat *
+              </label>
+              <Select
+                value={delTingkat}
+                onValueChange={(v) => {
+                  if (v) setDelTingkat(v);
+                  setDelKelasId(undefined);
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Pilih tingkat" />
+                </SelectTrigger>
+                <SelectContent>
+                  {[
+                    ...new Set(
+                      daftarKelas
+                        .filter((k) => k.jenjang === delJenjang)
+                        .map((k) => k.tingkat),
+                    ),
+                  ].map((t) => (
+                    <SelectItem key={t} value={t}>
+                      {t}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Kelas (opsional) */}
+            <div>
+              <label className="mb-1 block text-sm font-medium">
+                Kelas (opsional)
+              </label>
+              <Select
+                value={delKelasId ?? "all"}
+                onValueChange={(v) =>
+                  setDelKelasId(!v || v === "all" ? undefined : v)
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue>{selectedBulkDeleteKelasLabel}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua Kelas</SelectItem>
+                  {daftarKelas
+                    .filter(
+                      (k) =>
+                        k.jenjang === delJenjang && k.tingkat === delTingkat,
+                    )
+                    .map((k) => (
+                      <SelectItem key={k.id} value={k.id}>
+                        {k.namaKelas}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Konfirmasi */}
+            <div>
+              <label className="mb-1 block text-sm font-medium">
+                Ketik{" "}
+                <strong className="text-red-600">HAPUS PESERTA DIDIK</strong>{" "}
+                untuk melanjutkan
+              </label>
+              <input
+                type="text"
+                className="border-input w-full rounded-md border px-3 py-2 text-sm"
+                value={delKonfirmasi}
+                onChange={(e) => setDelKonfirmasi(e.target.value)}
+                placeholder="HAPUS"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              onClick={() => setShowBulkDeleteDialog(false)}
+            >
+              Batal
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={
+                delKonfirmasi !== "HAPUS PESERTA DIDIK" ||
+                !delJenjang ||
+                !delTingkat
+              }
+              onClick={() => {
+                deleteBanyakPesertaMutation.mutate({
+                  jenjang: delJenjang as "SD" | "SMP" | "SMA",
+                  tingkat: delTingkat,
+                  kelasId: delKelasId,
+                  konfirmasi: "HAPUS PESERTA DIDIK",
+                });
+              }}
+            >
+              {deleteBanyakPesertaMutation.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                "Hapus Permanen"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

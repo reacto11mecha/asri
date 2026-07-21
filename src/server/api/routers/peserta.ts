@@ -1,6 +1,6 @@
 // src/server/api/routers/peserta.ts
 import { createTRPCRouter, staffProcedure } from "~/server/api/trpc";
-import { eq, desc, asc, and } from "drizzle-orm";
+import { eq, desc, asc, and, inArray } from "drizzle-orm";
 import { pesertaDidik, kelas, user } from "~/server/db/schema";
 import JSZip from "jszip";
 import QRCode from "qrcode";
@@ -253,6 +253,42 @@ export const pesertaRouter = createTRPCRouter({
       return await ctx.db
         .delete(pesertaDidik)
         .where(eq(pesertaDidik.id, input.id));
+    }),
+
+  deleteBanyakPeserta: staffProcedure
+    .input(
+      z.object({
+        jenjang: z.enum(["SD", "SMP", "SMA"]),
+        tingkat: z.string().min(1, "Tingkat wajib diisi"),
+        kelasId: z.string().optional(),
+        konfirmasi: z.literal("HAPUS PESERTA DIDIK"),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Bangun kondisi join
+      const conditions = [
+        eq(kelas.jenjang, input.jenjang),
+        eq(kelas.tingkat, input.tingkat),
+      ];
+      if (input.kelasId) {
+        conditions.push(eq(kelas.id, input.kelasId));
+      }
+
+      // Ambil ID peserta yang memenuhi syarat
+      const toDelete = await ctx.db
+        .select({ id: pesertaDidik.id })
+        .from(pesertaDidik)
+        .innerJoin(kelas, eq(pesertaDidik.kelasId, kelas.id))
+        .where(and(...conditions));
+
+      if (toDelete.length === 0) {
+        return { deletedCount: 0 };
+      }
+
+      const ids = toDelete.map((r) => r.id);
+      await ctx.db.delete(pesertaDidik).where(inArray(pesertaDidik.id, ids));
+
+      return { deletedCount: ids.length };
     }),
 
   getAllKelas: staffProcedure.query(async ({ ctx }) => {
