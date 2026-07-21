@@ -72,7 +72,9 @@ export default function LoginPage() {
         <CardTitle className="text-2xl font-bold tracking-tight">
           Sistem Presensi
         </CardTitle>
-        <CardDescription>Sekolah Rakyat Terintegrasi 1 Kabupaten Bekasi</CardDescription>
+        <CardDescription>
+          Sekolah Rakyat Terintegrasi 1 Kabupaten Bekasi
+        </CardDescription>
       </CardHeader>
 
       <CardContent className="space-y-4">
