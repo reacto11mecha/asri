@@ -1,8 +1,13 @@
 // src/app/(dashboard)/dashboard/(staffonly)/bimbingan/monitor/[id]/page.tsx
 "use client";
 
+import { useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { api } from "~/trpc/react";
+import { format } from "date-fns";
+import { id as localeId } from "date-fns/locale";
+import { Badge } from "~/components/ui/badge";
+
 import { Button } from "~/components/ui/button";
 import {
   Card,
@@ -20,6 +25,14 @@ import {
   TableRow,
 } from "~/components/ui/table";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
+import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
+import {
   ArrowLeft,
   Plus,
   Pencil,
@@ -27,6 +40,8 @@ import {
   IdCard,
   GraduationCap,
   MapPin,
+  CalendarClock,
+  ShieldCheck,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -45,29 +60,58 @@ export default function DetailMonitoringPage() {
   const router = useRouter();
   const pesertaDidikId = params.id as string;
 
-  // 1. Fetch Profil Identitas Siswa
-  // (Pastikan endpoint ini mengembalikan relasi 'kelas' dan 'waliAsuh')
-  const { data: profil } = api.peserta.getById.useQuery({
-    id: pesertaDidikId,
-  });
+  // State untuk Filter
+  const [filterBulan, setFilterBulan] = useState("all");
+  const [filterTahun, setFilterTahun] = useState("all");
 
-  // 2. Fetch riwayat monitoring
-  const { data: riwayat, isLoading } = api.bimbingan.getDetailRiwayat.useQuery({
-    pesertaDidikId,
-  });
+  const { data: profil } = api.peserta.getById.useQuery({ id: pesertaDidikId });
+  const { data: riwayatRaw, isLoading } =
+    api.bimbingan.getDetailRiwayat.useQuery({ pesertaDidikId });
 
-  const chartData =
-    riwayat?.map((item) => ({
+  // 1. Pengurutan Absolut: Tahun -> Bulan -> Monev Ke (Semuanya Descending/Terbesar ke Terkecil)
+  const riwayatSorted = useMemo(() => {
+    if (!riwayatRaw) return [];
+    return [...riwayatRaw].sort((a, b) => {
+      // Prioritas 1: Tahun Terbesar
+      if (b.periodeTahun !== a.periodeTahun)
+        return Number(b.periodeTahun) - Number(a.periodeTahun);
+      // Prioritas 2: Bulan Terbesar
+      if (b.periodeBulan !== a.periodeBulan)
+        return Number(b.periodeBulan) - Number(a.periodeBulan);
+      // Prioritas 3: Monev Ke Terbesar
+      return b.monevKe - a.monevKe;
+    });
+  }, [riwayatRaw]);
+
+  // 2. Ekstraksi daftar tahun unik untuk dropdown filter
+  const daftarTahun = useMemo(() => {
+    const tahunSet = new Set(riwayatSorted.map((item) => item.periodeTahun));
+    return Array.from(tahunSet);
+  }, [riwayatSorted]);
+
+  // 3. Logika Filtering Client-Side
+  const filteredRiwayat = useMemo(() => {
+    return riwayatSorted.filter((item) => {
+      const matchBulan =
+        filterBulan === "all" || item.periodeBulan === filterBulan;
+      const matchTahun =
+        filterTahun === "all" || item.periodeTahun === filterTahun;
+      return matchBulan && matchTahun;
+    });
+  }, [riwayatSorted, filterBulan, filterTahun]);
+
+  // 4. Data Chart (Di-reverse agar urutan waktu di grafik berjalan maju dari kiri ke kanan)
+  const chartData = useMemo(() => {
+    return [...filteredRiwayat].reverse().map((item) => ({
       name: `Monev ${item.monevKe} (${item.periodeBulan}/${item.periodeTahun})`,
       ADL: item.totalSkorAdl,
       Sosial: item.totalSkorSosial,
       Mental: item.totalSkorMental,
       Vokasional: item.totalSkorVokasional,
-    })) || [];
+    }));
+  }, [filteredRiwayat]);
 
-  if (isLoading) {
-    return <div className="p-6">Memuat data monitoring...</div>;
-  }
+  if (isLoading) return <div className="p-6">Memuat data monitoring...</div>;
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -91,15 +135,14 @@ export default function DetailMonitoringPage() {
             <Link
               href={`/dashboard/bimbingan/monitor/${pesertaDidikId}/tambah`}
             >
-              <Plus className="mr-2 h-4 w-4" />
-              Tambah Evaluasi (Monev)
+              <Plus className="mr-2 h-4 w-4" /> Tambah Evaluasi (Monev)
             </Link>
           }
           nativeButton={false}
         />
       </div>
 
-      {/* --- KARTU IDENTITAS PESERTA DIDIK --- */}
+      {/* --- KARTU IDENTITAS --- */}
       {profil && (
         <Card className="bg-muted/40">
           <CardContent className="p-6">
@@ -108,15 +151,12 @@ export default function DetailMonitoringPage() {
                 <User className="h-8 w-8" />
               </div>
               <div className="grid flex-1 grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-                {/* Info Utama */}
                 <div className="space-y-1">
                   <p className="text-muted-foreground flex items-center gap-2 text-sm font-medium">
                     <User className="h-3.5 w-3.5" /> Nama Lengkap
                   </p>
                   <p className="text-lg font-semibold">{profil.namaLengkap}</p>
                 </div>
-
-                {/* Info Akademik */}
                 <div className="space-y-1">
                   <p className="text-muted-foreground flex items-center gap-2 text-sm font-medium">
                     <IdCard className="h-3.5 w-3.5" /> NIPD / NISN
@@ -125,8 +165,6 @@ export default function DetailMonitoringPage() {
                     {profil.nipd} {profil.nisn ? `/ ${profil.nisn}` : ""}
                   </p>
                 </div>
-
-                {/* Info Kelas */}
                 <div className="space-y-1">
                   <p className="text-muted-foreground flex items-center gap-2 text-sm font-medium">
                     <GraduationCap className="h-3.5 w-3.5" /> Kelas
@@ -136,8 +174,6 @@ export default function DetailMonitoringPage() {
                     {profil.kelas?.jenjang})
                   </p>
                 </div>
-
-                {/* Info Wali Asuh */}
                 <div className="space-y-1">
                   <p className="text-muted-foreground flex items-center gap-2 text-sm font-medium">
                     <MapPin className="h-3.5 w-3.5" /> Wali Asuh
@@ -152,13 +188,84 @@ export default function DetailMonitoringPage() {
         </Card>
       )}
 
-      {/* --- GRAFIK TREN PERKEMBANGAN --- */}
+      {/* --- FILTER CONTROL --- */}
+      <div className="bg-muted/20 flex flex-col items-end gap-4 rounded-lg border p-4 sm:flex-row">
+        <div className="w-full flex-1 space-y-1.5 sm:max-w-xs">
+          <label className="text-sm font-medium">Filter Tahun</label>
+          <Select
+            value={filterTahun}
+            onValueChange={(tahun) =>
+              setFilterTahun(!tahun || tahun === "" ? "all" : tahun)
+            }
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Pilih Tahun" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Semua Tahun</SelectItem>
+              {daftarTahun.map((tahun) => (
+                <SelectItem key={tahun} value={tahun}>
+                  {tahun}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="w-full flex-1 space-y-1.5 sm:max-w-xs">
+          <label className="text-sm font-medium">Filter Bulan</label>
+          <Select
+            value={filterBulan}
+            onValueChange={(bulan) =>
+              setFilterBulan(!bulan || bulan === "" ? "all" : bulan)
+            }
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Pilih Bulan" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Semua Bulan</SelectItem>
+              {[
+                "01",
+                "02",
+                "03",
+                "04",
+                "05",
+                "06",
+                "07",
+                "08",
+                "09",
+                "10",
+                "11",
+                "12",
+              ].map((b) => (
+                <SelectItem key={b} value={b}>
+                  {new Date(0, parseInt(b) - 1).toLocaleString("id-ID", {
+                    month: "long",
+                  })}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        {(filterBulan !== "all" || filterTahun !== "all") && (
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setFilterBulan("all");
+              setFilterTahun("all");
+            }}
+          >
+            Reset Filter
+          </Button>
+        )}
+      </div>
+
+      {/* --- GRAFIK TREN --- */}
       <Card>
         <CardHeader>
           <CardTitle>Tren Perkembangan Berdasarkan Aspek</CardTitle>
           <CardDescription>
-            Melacak skor ADL, Sosial, Mental, dan Vokasional dari waktu ke
-            waktu.
+            Melacak skor evaluasi berdasarkan rentang waktu yang difilter.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -224,7 +331,7 @@ export default function DetailMonitoringPage() {
           ) : (
             <div className="flex h-[300px] items-center justify-center rounded-lg border-2 border-dashed">
               <p className="text-muted-foreground">
-                Belum ada data evaluasi untuk ditampilkan.
+                Belum ada data evaluasi untuk filter ini.
               </p>
             </div>
           )}
@@ -233,44 +340,94 @@ export default function DetailMonitoringPage() {
 
       {/* --- TABEL RIWAYAT EVALUASI --- */}
       <Card>
-        {/* ... (Kode tabel sama persis seperti sebelumnya) ... */}
         <CardHeader>
           <CardTitle>Riwayat Evaluasi (Monev)</CardTitle>
           <CardDescription>
-            Daftar seluruh laporan perkembangan bulanan yang telah dilakukan.
+            Daftar laporan perkembangan bulanan. Laporan disusun dari yang
+            paling baru.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border">
-            <Table>
+          <div className="overflow-x-auto rounded-md border">
+            <Table className="min-w-[900px]">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[100px]">Monev Ke</TableHead>
-                  <TableHead>Periode</TableHead>
-                  <TableHead className="text-center">Skor ADL</TableHead>
-                  <TableHead className="text-center">Skor Sosial</TableHead>
-                  <TableHead className="text-center">Skor Mental</TableHead>
-                  <TableHead className="text-center">Skor Vokasional</TableHead>
+                  <TableHead className="w-[120px]">Periode Monev</TableHead>
+                  <TableHead>Waktu Entri / Update</TableHead>
+                  <TableHead>Pembuat / Penilai</TableHead>
+                  <TableHead className="text-center">ADL</TableHead>
+                  <TableHead className="text-center">Sosial</TableHead>
+                  <TableHead className="text-center">Mental</TableHead>
+                  <TableHead className="text-center">Vokas</TableHead>
                   <TableHead className="text-center font-bold">Total</TableHead>
                   <TableHead className="text-right">Aksi</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {riwayat?.length === 0 ? (
+                {filteredRiwayat.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="h-24 text-center">
-                      Belum ada catatan monev.
+                    <TableCell colSpan={9} className="h-24 text-center">
+                      Belum ada catatan monev yang sesuai filter.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  [...(riwayat || [])].reverse().map((item) => (
+                  filteredRiwayat.map((item) => (
                     <TableRow key={item.id}>
-                      <TableCell className="font-medium">
-                        Monev {item.monevKe}
+                      <TableCell className="font-medium whitespace-nowrap">
+                        Monev {item.monevKe} <br />
+                        <span className="text-muted-foreground text-xs">
+                          {item.periodeBulan}/{item.periodeTahun}
+                        </span>
                       </TableCell>
+
+                      <TableCell className="text-sm whitespace-nowrap">
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-1.5">
+                            <CalendarClock className="text-muted-foreground h-3.5 w-3.5" />
+                            {format(
+                              new Date(item.updatedAt ?? item.createdAt),
+                              "dd MMM yyyy, HH:mm",
+                              { locale: localeId },
+                            )}
+                          </div>
+                          {item.createdAt.toISOString() !==
+                          item.updatedAt.toISOString() ? (
+                            <Badge variant="outline">Diupdate</Badge>
+                          ) : null}
+                        </div>
+                      </TableCell>
+
+                      {/* INFORMASI AUTHOR DENGAN AVATAR */}
                       <TableCell>
-                        {item.periodeBulan}/{item.periodeTahun}
+                        <div className="flex items-center gap-2 text-sm font-medium">
+                          {item.author ? (
+                            <>
+                              <Avatar className="h-7 w-7 border">
+                                <AvatarImage
+                                  src={item.author.image ?? ""}
+                                  alt={item.author.name ?? "Avatar"}
+                                />
+                                <AvatarFallback className="bg-primary/10 text-primary text-[10px] font-bold">
+                                  {item.author.name
+                                    ?.substring(0, 2)
+                                    .toUpperCase() ?? "ST"}
+                                </AvatarFallback>
+                              </Avatar>
+                              <span>{item.author.name}</span>
+                            </>
+                          ) : (
+                            <>
+                              <div className="flex h-7 w-7 items-center justify-center rounded-full border border-emerald-200 bg-emerald-100">
+                                <ShieldCheck className="h-4 w-4 text-emerald-600" />
+                              </div>
+                              <span className="text-muted-foreground">
+                                Sistem
+                              </span>
+                            </>
+                          )}
+                        </div>
                       </TableCell>
+
                       <TableCell className="text-center">
                         {item.totalSkorAdl}
                       </TableCell>
@@ -286,23 +443,21 @@ export default function DetailMonitoringPage() {
                       <TableCell className="text-primary text-center font-bold">
                         {item.totalSkorKeseluruhan}
                       </TableCell>
+
                       <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-8"
-                            render={
-                              <Link
-                                href={`/dashboard/bimbingan/monitor/${pesertaDidikId}/edit/${item.id}`}
-                              >
-                                <Pencil className="mr-2 h-3.5 w-3.5" />
-                                Edit
-                              </Link>
-                            }
-                            nativeButton={false}
-                          />
-                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8"
+                          render={
+                            <Link
+                              href={`/dashboard/bimbingan/monitor/${pesertaDidikId}/edit/${item.id}`}
+                            >
+                              <Pencil className="mr-2 h-3.5 w-3.5" /> Edit
+                            </Link>
+                          }
+                          nativeButton={false}
+                        />
                       </TableCell>
                     </TableRow>
                   ))

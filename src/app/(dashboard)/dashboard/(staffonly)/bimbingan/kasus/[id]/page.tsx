@@ -12,14 +12,8 @@ import { id as localeId } from "date-fns/locale";
 import jsPDF from "jspdf";
 import { cn } from "~/lib/utils";
 
-import { Button, buttonVariants } from "~/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "~/components/ui/card";
+import { Button } from "~/components/ui/button";
+import { Card, CardContent } from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
 import { Input } from "~/components/ui/input";
 import { Textarea } from "~/components/ui/textarea";
@@ -37,7 +31,6 @@ import {
 import {
   Field,
   FieldLabel,
-  FieldError,
   FieldGroup,
   FieldSet,
   FieldLegend,

@@ -29,13 +29,15 @@ export const bimbinganRouter = createTRPCRouter({
     .input(
       z.object({
         jenjang: z.enum(["SD", "SMP", "SMA"]).optional(),
-              tingkat: z.string().optional(),
-              kelasId: z.string().optional(),
-              search: z.string().optional(),
-              statusEvaluasi: z.enum(["semua", "sudah", "belum"]).optional().default("semua"),
-              page: z.number().min(1).optional().default(1),
-              limit: z.number().min(5).max(100).optional().default(10),
-
+        tingkat: z.string().optional(),
+        kelasId: z.string().optional(),
+        search: z.string().optional(),
+        statusEvaluasi: z
+          .enum(["semua", "sudah", "belum"])
+          .optional()
+          .default("semua"),
+        page: z.number().min(1).optional().default(1),
+        limit: z.number().min(5).max(100).optional().default(10),
       }),
     )
     .query(async ({ ctx, input }) => {
@@ -251,6 +253,14 @@ export const bimbinganRouter = createTRPCRouter({
       return await ctx.db.query.monitoringPerkembangan.findMany({
         where: eq(monitoringPerkembangan.pesertaDidikId, input.pesertaDidikId),
         orderBy: [asc(monitoringPerkembangan.monevKe)],
+        with: {
+          author: {
+            columns: {
+              name: true,
+              image: true,
+            },
+          },
+        },
       });
     }),
 
@@ -306,6 +316,9 @@ export const bimbinganRouter = createTRPCRouter({
     .input(
       z.object({
         id: z.string(),
+        monevKe: z.number().min(1),
+        periodeBulan: z.string().length(2),
+        periodeTahun: z.string().length(4),
         skorAdl: z.record(z.string(), z.number()).optional(),
         skorSosial: z.record(z.string(), z.number()).optional(),
         skorMental: z.record(z.string(), z.number()).optional(),
