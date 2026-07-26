@@ -1,3 +1,4 @@
+// src/app/(dashboard)/dashboard/(staffonly)/bimbingan/monitor/[id]/page.tsx
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
