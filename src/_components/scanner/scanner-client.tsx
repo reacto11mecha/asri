@@ -22,7 +22,6 @@ export default function ScannerClient({
   const isPausedRef = useRef(isPaused);
   const onScanRef = useRef(onScan);
 
-  // Sinkronkan refs
   useEffect(() => {
     onScanRef.current = onScan;
   }, [onScan]);
@@ -31,12 +30,11 @@ export default function ScannerClient({
     isPausedRef.current = isPaused;
   }, [isPaused]);
 
-  // Inisialisasi scanner
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
 
-    const currentInstanceId = ++scannerInstanceIdRef.current; // ID unik untuk instance ini
+    const currentInstanceId = ++scannerInstanceIdRef.current;
 
     const scanner = new QrScanner(
       video,
@@ -54,7 +52,6 @@ export default function ScannerClient({
 
     const startScanner = async () => {
       try {
-        // Ekstrak kamera yang diinginkan
         let targetCamera: string | undefined;
 
         if (typeof cameraConfig === "string") {
@@ -82,22 +79,34 @@ export default function ScannerClient({
           }
         }
 
-        // Atur kamera jika ada
         if (targetCamera) {
-          await scanner.setCamera(targetCamera);
+          try {
+            await scanner.setCamera(targetCamera);
+          } catch (setErr) {
+            if (setErr instanceof Error && setErr.name === "AbortError") {
+              return;
+            }
+            throw setErr;
+          }
         }
 
-        // Cek apakah instance ini masih yang terbaru
         if (currentInstanceId !== scannerInstanceIdRef.current) {
-          // Scanner sudah diganti (destroyed), hentikan
           return;
         }
 
-        // Mulai scan
-        await scanner.start();
+        try {
+          await scanner.start();
+        } catch (startErr) {
+          if (startErr instanceof Error && startErr.name === "AbortError") {
+            return;
+          }
+          throw startErr;
+        }
       } catch (err) {
-        // Jika instance sudah tidak relevan, abaikan error (misal karena destroyed)
         if (currentInstanceId !== scannerInstanceIdRef.current) {
+          return;
+        }
+        if (err instanceof Error && err.name === "AbortError") {
           return;
         }
         if (onError) {
@@ -109,13 +118,13 @@ export default function ScannerClient({
     startScanner();
 
     return () => {
-      // Stop dan destroy scanner
+      // Cleanup
       if (scannerRef.current) {
-        scannerRef.current.stop();
+        // stop() mungkin synchronous atau Promise, bungkus dengan Promise.resolve agar selalu Promise
+        Promise.resolve(scannerRef.current.stop()).catch(() => {});
         scannerRef.current.destroy();
         scannerRef.current = null;
       }
-      // Bersihkan stream video
       if (video.srcObject) {
         (video.srcObject as MediaStream)
           .getTracks()
@@ -127,10 +136,7 @@ export default function ScannerClient({
 
   return (
     <div className="relative h-full w-full overflow-hidden">
-      {/* Elemen video untuk kamera */}
       <video ref={videoRef} className="h-full w-full object-cover" />
-
-      {/* Overlay kotak penanda kuning */}
       <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
         <div className="relative h-64 w-64 md:h-72 md:w-72">
           <div className="absolute top-0 left-0 h-8 w-8 rounded-tl-lg border-t-4 border-l-4 border-yellow-400" />
