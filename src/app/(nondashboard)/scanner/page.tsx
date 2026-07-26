@@ -19,6 +19,7 @@ import {
 import { Input } from "~/components/ui/input";
 import { Card, CardContent } from "~/components/ui/card";
 import { toast } from "sonner";
+import { useBeep } from "~/hooks/use-beep";
 import QrScanner from "qr-scanner";
 
 const ScannerClient = dynamic(
@@ -36,6 +37,8 @@ const ScannerClient = dynamic(
 export default function ScannerPage() {
   const router = useRouter();
   const utils = api.useUtils();
+
+  const { playSuccess, playError, prewarm } = useBeep();
 
   const [lastFailedNipd, setLastFailedNipd] = useState<string | null>(null);
   const [cooldownUntil, setCooldownUntil] = useState<number>(0);
@@ -115,6 +118,7 @@ export default function ScannerPage() {
   const scanMutation = api.aktivitas.scanQr.useMutation({
     onSuccess: (data) => {
       setScanStatus("success");
+      playSuccess();
       setScanData(data);
       utils.aktivitas.getRecentLogs.invalidate();
       setTimeout(() => {
@@ -125,6 +129,7 @@ export default function ScannerPage() {
     },
     onError: (error, variables) => {
       setScanStatus("error");
+      playError();
       setErrorMessage(error.message);
       setLastFailedNipd(variables.nipd);
       setCooldownUntil(Date.now() + 5000);
@@ -311,7 +316,10 @@ export default function ScannerPage() {
                 <Button
                   className="h-12 w-full text-base font-semibold"
                   disabled={!sesiId}
-                  onClick={() => setIsConfigured(true)}
+                  onClick={() => {
+                    setIsConfigured(true);
+                    prewarm();
+                  }}
                 >
                   Mulai Scanner
                 </Button>
