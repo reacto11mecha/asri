@@ -63,19 +63,22 @@ export function useRfidScanner({ onScan, enabled }: UseRfidScannerOptions) {
     if (value.includes("\n") || value.includes("\r")) {
       const uid = value
         .replace(/[\n\r]/g, "")
-        .trim()
-        .toUpperCase();
-      if (/^[0-9A-F]{8}$/.test(uid)) {
+        .replace(/[^0-9A-Fa-f]/g, "")
+        .toUpperCase()
+        .slice(0, 8);
+      if (uid.length === 8) {
         onScanRef.current(uid);
       }
       e.currentTarget.value = "";
       bufferRef.current = "";
     } else {
       bufferRef.current += value;
-      // Jika sudah 8 karakter hex
       if (bufferRef.current.length >= 8) {
-        const uid = bufferRef.current.slice(0, 8).toUpperCase();
-        if (/^[0-9A-F]{8}$/.test(uid)) {
+        const uid = bufferRef.current
+          .slice(0, 8)
+          .replace(/[^0-9A-Fa-f]/g, "")
+          .toUpperCase();
+        if (uid.length === 8) {
           onScanRef.current(uid);
         }
         bufferRef.current = "";
