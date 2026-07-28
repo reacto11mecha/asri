@@ -80,7 +80,9 @@ export const getPesertaColumns = ({
   {
     accessorKey: "nipd",
     header: "NIPD",
-    cell: ({ row }) => <span className="font-mono">{row.original.nipd}</span>,
+    cell: ({ row }) => (
+      <span className="text-center font-mono">{row.original.nipd}</span>
+    ),
   },
   { accessorKey: "namaLengkap", header: "Nama Lengkap" },
   {
@@ -93,6 +95,15 @@ export const getPesertaColumns = ({
         <span className="text-muted-foreground text-xs">
           {row.original.kelas.jenjang}
         </span>
+      </span>
+    ),
+  },
+  {
+    accessorKey: "uidKartu",
+    header: "UID Kartu",
+    cell: ({ row }) => (
+      <span className="text-center font-mono">
+        {row.original.uidKartu ?? "N/A"}
       </span>
     ),
   },

@@ -74,6 +74,7 @@ const formSchema = z.object({
   pekerjaanAyah: z.string().optional(),
   penghasilanAyah: z.string().optional(),
   nikAyah: z.string().optional(),
+  uidKartu: z.string().optional(),
 });
 
 type FieldConfig = {
@@ -139,7 +140,7 @@ export function EditPesertaForm({ initialData }: { initialData: any }) {
   const { data: daftarWali = [], isLoading: loadingWali } =
     api.peserta.getWaliAsuh.useQuery();
 
-  const updatePesertaMutation = api.peserta.updatePeserta.useMutation({
+  const pairRfidPesertaMutation = api.peserta.pairRfid.useMutation({
     onSuccess: async () => {
       await utils.peserta.getAll.invalidate();
       router.push("/dashboard/peserta");
@@ -190,11 +191,12 @@ export function EditPesertaForm({ initialData }: { initialData: any }) {
       pekerjaanAyah: initialData.pekerjaanAyah || "",
       penghasilanAyah: initialData.penghasilanAyah || "",
       nikAyah: initialData.nikAyah || "",
+      uidKartu: initialData.uidKartu || "",
     },
   });
 
   function onSubmit(data: z.infer<typeof formSchema>) {
-    updatePesertaMutation.mutate(data);
+    pairRfidPesertaMutation.mutate(data);
   }
 
   const renderFields = (fields: FieldConfig[]) =>
@@ -370,6 +372,40 @@ export function EditPesertaForm({ initialData }: { initialData: any }) {
                 </Field>
               )}
             />
+
+            <Controller
+              name="uidKartu"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel htmlFor={field.name}>
+                    UID Kartu RFID (Opsional)
+                  </FieldLabel>
+                  <Input
+                    {...field}
+                    value={(field.value as string) || ""}
+                    id={field.name}
+                    autoComplete="off"
+                    placeholder="8 karakter hex, contoh: A1B2C3D4"
+                    aria-invalid={fieldState.invalid}
+                    onChange={(e) => {
+                      const cleaned = e.target.value
+                        .replace(/[^0-9A-Fa-f]/g, "")
+                        .toUpperCase()
+                        .slice(0, 8);
+                      field.onChange(cleaned);
+                    }}
+                  />
+                  <FieldDescription>
+                    Nomor seri kartu RFID untuk absensi tap. Otomatis
+                    dibersihkan.
+                  </FieldDescription>
+                  {fieldState.invalid && (
+                    <FieldError errors={[fieldState.error]} />
+                  )}
+                </Field>
+              )}
+            />
           </CardContent>
         </Card>
 
@@ -503,8 +539,8 @@ export function EditPesertaForm({ initialData }: { initialData: any }) {
           <Button type="button" variant="ghost" onClick={() => router.back()}>
             Batal
           </Button>
-          <Button type="submit" disabled={updatePesertaMutation.isPending}>
-            {updatePesertaMutation.isPending ? (
+          <Button type="submit" disabled={pairRfidPesertaMutation.isPending}>
+            {pairRfidPesertaMutation.isPending ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
               <Save className="mr-2 h-4 w-4" />

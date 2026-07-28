@@ -53,6 +53,7 @@ const insertPesertaSchema = z.object({
   pekerjaanAyah: z.string().optional(),
   penghasilanAyah: z.string().optional(),
   nikAyah: z.string().optional(),
+  uidKartu: z.string().optional(),
 });
 
 const getAllInputSchema = z.object({
@@ -96,6 +97,17 @@ export const pesertaRouter = createTRPCRouter({
         kelas: row.kelas,
         waliAsuh: row.waliAsuh,
       }));
+    }),
+
+  getByNipd: staffProcedure
+    .input(z.object({ nipd: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const peserta = await ctx.db.query.pesertaDidik.findFirst({
+        where: eq(pesertaDidik.nipd, input.nipd),
+        with: { kelas: true },
+      });
+      if (!peserta) throw new Error("Peserta tidak ditemukan");
+      return peserta;
     }),
 
   getById: staffProcedure
@@ -169,6 +181,7 @@ export const pesertaRouter = createTRPCRouter({
         noKk: parseEmptyString(input.noKk),
         nikIbu: parseEmptyString(input.nikIbu),
         nikAyah: parseEmptyString(input.nikAyah),
+        uidKartu: parseEmptyString(input.uidKartu),
 
         tanggalLahir: parseDate(input.tanggalLahir),
         tanggalLahirIbu: parseDate(input.tanggalLahirIbu),
@@ -358,7 +371,22 @@ export const pesertaRouter = createTRPCRouter({
           penghasilanAyah: parseEmptyString(input.penghasilanAyah),
           nikAyah: parseEmptyString(input.nikAyah),
           waliAsuhId: parseWali(input.waliAsuhId),
+          uidKartu: parseEmptyString(input.uidKartu),
         })
+        .where(eq(pesertaDidik.id, input.id));
+    }),
+
+  pairRfid: staffProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        uidKartu: z.string().length(8),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      return await ctx.db
+        .update(pesertaDidik)
+        .set({ uidKartu: input.uidKartu })
         .where(eq(pesertaDidik.id, input.id));
     }),
 

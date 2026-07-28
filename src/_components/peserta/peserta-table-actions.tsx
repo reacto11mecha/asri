@@ -12,6 +12,7 @@ import {
   Trash2,
   FileSpreadsheet,
   QrCode,
+  Camera,
 } from "lucide-react";
 import Link from "next/link";
 import type { InsertPesertaType } from "~/server/api/routers/peserta";
@@ -462,6 +463,15 @@ export function PesertaTableActions() {
           render={
             <Link href="/dashboard/peserta/tambah">
               <Plus className="mr-2 h-4 w-4" /> Tambah Manual
+            </Link>
+          }
+          nativeButton={false}
+        />
+
+        <Button
+          render={
+            <Link href="/dashboard/peserta/pairing">
+              <Camera className="mr-2 h-4 w-4" /> Pairing RFID
             </Link>
           }
           nativeButton={false}
