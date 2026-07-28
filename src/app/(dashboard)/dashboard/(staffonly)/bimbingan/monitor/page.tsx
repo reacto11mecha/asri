@@ -1,9 +1,9 @@
 // src/app/(dashboard)/dashboard/(staffonly)/bimbingan/monitor/page.tsx
 "use client";
 
-import { useState, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { api } from "~/trpc/react";
 import {
   Table,
@@ -36,26 +36,36 @@ import { cn } from "~/lib/utils";
 
 export default function MonitorListPage() {
   const router = useRouter();
+
   const [jenjang, setJenjang] = useState<"SD" | "SMP" | "SMA" | "all">("all");
   const [tingkat, setTingkat] = useState<string>("all");
   const [kelasId, setKelasId] = useState<string>("all");
-  const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"semua" | "sudah" | "belum">(
     "semua",
   );
-  const [page, setPage] = useState(1);
-  const limit = 10;
 
-  // Fetch kelas untuk dropdown
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10); // <- Limit diubah menjadi state
+
+  // Implementasi Debounce Search
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
   const { data: daftarKelas = [] } = api.peserta.getAllKelas.useQuery();
 
-  // Fetch data monitoring
   const { data: monitoringData, isLoading } =
     api.bimbingan.getOverviewMonitoring.useQuery({
       jenjang: jenjang === "all" ? undefined : jenjang,
       tingkat: tingkat === "all" ? undefined : tingkat,
       kelasId: kelasId === "all" ? undefined : kelasId,
-      search: searchQuery || undefined,
+      search: debouncedSearch || undefined,
       statusEvaluasi: statusFilter === "semua" ? undefined : statusFilter,
       page,
       limit,
@@ -63,7 +73,6 @@ export default function MonitorListPage() {
 
   const totalPages = monitoringData?.totalPages ?? 1;
 
-  // Filter dropdown untuk jenjang, tingkat, kelas
   const tingkatOptions = useMemo(
     () => [
       ...new Set(
@@ -72,6 +81,7 @@ export default function MonitorListPage() {
     ],
     [daftarKelas, jenjang],
   );
+
   const kelasOptions = useMemo(
     () =>
       daftarKelas.filter(
@@ -81,7 +91,6 @@ export default function MonitorListPage() {
     [daftarKelas, jenjang, tingkat],
   );
 
-  // Label untuk dropdown kelas
   const selectedKelasLabel =
     kelasId === "all"
       ? "Semua"
@@ -100,7 +109,6 @@ export default function MonitorListPage() {
         </div>
       </div>
 
-      {/* Insight Kritis (tetap muncul di atas) */}
       {monitoringData && monitoringData.insightKritis.length > 0 && (
         <Card className="border-destructive/50 bg-destructive/10">
           <CardHeader className="pb-3">
@@ -149,6 +157,7 @@ export default function MonitorListPage() {
                 setJenjang(v as typeof jenjang);
                 setTingkat("all");
                 setKelasId("all");
+                setPage(1);
               }}
             >
               <SelectTrigger className="w-[120px]">
@@ -162,7 +171,7 @@ export default function MonitorListPage() {
               </SelectContent>
             </Select>
           </div>
-          {jenjang !== "all" ? (
+          {jenjang !== "all" && (
             <>
               <div>
                 <label className="mb-1 block text-sm font-medium">
@@ -171,8 +180,9 @@ export default function MonitorListPage() {
                 <Select
                   value={tingkat}
                   onValueChange={(v) => {
-                    setTingkat(v);
+                    if (v) setTingkat(v);
                     setKelasId("all");
+                    setPage(1);
                   }}
                 >
                   <SelectTrigger className="w-[120px]">
@@ -192,7 +202,10 @@ export default function MonitorListPage() {
                 <label className="mb-1 block text-sm font-medium">Kelas</label>
                 <Select
                   value={kelasId}
-                  onValueChange={(v) => setKelasId(v ?? "all")}
+                  onValueChange={(v) => {
+                    setKelasId(v ?? "all");
+                    setPage(1);
+                  }}
                 >
                   <SelectTrigger className="w-[150px]">
                     <SelectValue>{selectedKelasLabel}</SelectValue>
@@ -208,7 +221,7 @@ export default function MonitorListPage() {
                 </Select>
               </div>
             </>
-          ) : null}
+          )}
         </div>
         <div className="flex flex-1 items-center justify-end gap-4">
           <div className="relative w-full sm:w-64">
@@ -242,7 +255,6 @@ export default function MonitorListPage() {
         </div>
       </div>
 
-      {/* Tabel */}
       <Card>
         <CardContent className="p-0">
           <Table>
@@ -273,7 +285,13 @@ export default function MonitorListPage() {
                 </TableRow>
               ) : (
                 monitoringData?.tabelData.map((row) => (
-                  <TableRow key={row.id}>
+                  <TableRow
+                    key={row.id}
+                    className="hover:bg-muted/50 cursor-pointer transition-colors"
+                    onClick={() =>
+                      router.push(`/dashboard/bimbingan/monitor/${row.id}`)
+                    }
+                  >
                     <TableCell className="px-6 py-3 font-medium">
                       {row.namaLengkap}
                     </TableCell>
@@ -301,15 +319,18 @@ export default function MonitorListPage() {
                       {row.periodeTerakhir}
                     </TableCell>
                     <TableCell className="px-6 py-3 text-right">
-                      <Link
-                        href={`/dashboard/bimbingan/monitor/${row.id}`}
-                        className={cn(
-                          buttonVariants({ variant: "ghost", size: "sm" }),
-                          "gap-2",
-                        )}
-                      >
-                        <Eye className="h-4 w-4" /> Detail
-                      </Link>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="pointer-events-auto gap-2"
+                        onClick={(e) => e.stopPropagation()}
+                        nativeButton={false}
+                        render={
+                          <Link href={`/dashboard/bimbingan/monitor/${row.id}`}>
+                            <Eye className="h-4 w-4" /> Detail
+                          </Link>
+                        }
+                      />
                     </TableCell>
                   </TableRow>
                 ))
@@ -319,13 +340,36 @@ export default function MonitorListPage() {
         </CardContent>
       </Card>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between">
+      {/* Tampilan Pagination + Limit Control */}
+      <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
+        {/* Bagian Limit Info & Control */}
+        <div className="flex items-center gap-2">
+          <p className="text-muted-foreground text-sm">Menampilkan</p>
+          <Select
+            value={limit.toString()}
+            onValueChange={(v) => {
+              setLimit(Number(v));
+              setPage(1); // Reset page jika limit berubah
+            }}
+          >
+            <SelectTrigger className="h-8 w-[70px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {[5, 10, 25, 50, 100].map((val) => (
+                <SelectItem key={val} value={val.toString()}>
+                  {val}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <p className="text-muted-foreground text-sm">
-            Menampilkan {monitoringData?.tabelData.length ?? 0} dari{" "}
-            {monitoringData?.totalCount ?? 0} data
+            dari {monitoringData?.totalCount ?? 0} data
           </p>
+        </div>
+
+        {/* Bagian Page Control */}
+        {totalPages > 1 && (
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
@@ -335,7 +379,7 @@ export default function MonitorListPage() {
             >
               <ChevronLeft className="h-4 w-4" /> Sebelumnya
             </Button>
-            <span className="text-sm">
+            <span className="px-2 text-sm">
               Halaman {page} dari {totalPages}
             </span>
             <Button
@@ -347,8 +391,8 @@ export default function MonitorListPage() {
               Selanjutnya <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

@@ -53,6 +53,10 @@ export const bimbinganRouter = createTRPCRouter({
         conditions.push(eq(kelas.tingkat, input.tingkat));
       }
 
+      if (input.search) {
+        conditions.push(ilike(pesertaDidik.namaLengkap, `%${input.search}%`));
+      }
+
       const daftarSiswa = await ctx.db
         .select({
           id: pesertaDidik.id,
@@ -107,9 +111,21 @@ export const bimbinganRouter = createTRPCRouter({
         peringatan: string[];
       }> = [];
 
-      const tabelData = daftarSiswa.map((siswa) => {
+      // 1. Definisikan tipe data secara ketat (Strict Type)
+      type TabelDataRow = {
+        id: string;
+        namaLengkap: string;
+        kelas: string;
+        statusEvaluasi: string;
+        skorTerakhir: number | null;
+        periodeTerakhir: string;
+      };
+
+      // 2. Gunakan tipe tersebut pada parameter generik reduce
+      const allData = daftarSiswa.reduce<TabelDataRow[]>((acc, siswa) => {
         const rapor = raporMap.get(siswa.id);
         let statusEvaluasi = "Belum Dievaluasi";
+
         if (
           rapor &&
           rapor.periodeBulan === currentMonth &&
@@ -117,6 +133,18 @@ export const bimbinganRouter = createTRPCRouter({
         ) {
           statusEvaluasi = "Sudah Dievaluasi";
         }
+
+        // Terapkan filter status
+        if (
+          input.statusEvaluasi === "sudah" &&
+          statusEvaluasi !== "Sudah Dievaluasi"
+        )
+          return acc;
+        if (
+          input.statusEvaluasi === "belum" &&
+          statusEvaluasi !== "Belum Dievaluasi"
+        )
+          return acc;
 
         if (rapor) {
           const peringatan: string[] = [];
@@ -138,19 +166,27 @@ export const bimbinganRouter = createTRPCRouter({
           }
         }
 
-        return {
+        acc.push({
           id: siswa.id,
           namaLengkap: siswa.namaLengkap,
-          kelas: `${siswa.kelas.tingkat} ${siswa.kelas.namaKelas}`,
+          kelas: `${siswa.kelas.tingkat} ${siswa.kelas.namaKelas} (${siswa.kelas.jenjang})`,
           statusEvaluasi,
           skorTerakhir: rapor?.totalSkorKeseluruhan ?? null,
           periodeTerakhir: rapor
             ? `${rapor.periodeBulan}/${rapor.periodeTahun}`
             : "-",
-        };
-      });
+        });
 
-      return { tabelData, insightKritis };
+        return acc;
+      }, []);
+
+      // 3. Hitung pagination
+      const totalCount = allData.length;
+      const totalPages = Math.ceil(totalCount / input.limit);
+      const offset = (input.page - 1) * input.limit;
+      const tabelData = allData.slice(offset, offset + input.limit);
+
+      return { tabelData, insightKritis, totalCount, totalPages };
     }),
 
   // ==========================================

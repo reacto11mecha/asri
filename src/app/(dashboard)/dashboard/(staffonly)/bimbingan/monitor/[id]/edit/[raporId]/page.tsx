@@ -467,7 +467,10 @@ export default function EditMonevPage() {
                   {renderScoreInputs("skorAdl", indikatorAdl)}
                   {form.formState.errors.skorAdl && (
                     <p className="text-destructive mt-2 text-sm font-medium">
-                      {form.formState.errors.skorAdl.message}
+                      {
+                        (form.formState.errors.skorAdl as { message?: string })
+                          .message
+                      }
                     </p>
                   )}
                 </FieldSet>
@@ -493,7 +496,13 @@ export default function EditMonevPage() {
                   {renderScoreInputs("skorSosial", indikatorSosial)}
                   {form.formState.errors.skorSosial && (
                     <p className="text-destructive mt-2 text-sm font-medium">
-                      {form.formState.errors.skorSosial.message}
+                      {
+                        (
+                          form.formState.errors.skorSosial as {
+                            message?: string;
+                          }
+                        ).message
+                      }
                     </p>
                   )}
                 </FieldSet>
@@ -521,7 +530,13 @@ export default function EditMonevPage() {
                   {renderScoreInputs("skorMental", indikatorMental)}
                   {form.formState.errors.skorMental && (
                     <p className="text-destructive mt-2 text-sm font-medium">
-                      {form.formState.errors.skorMental.message}
+                      {
+                        (
+                          form.formState.errors.skorMental as {
+                            message?: string;
+                          }
+                        ).message
+                      }
                     </p>
                   )}
                 </FieldSet>
@@ -550,7 +565,13 @@ export default function EditMonevPage() {
                   {renderScoreInputs("skorVokasional", indikatorVokasional)}
                   {form.formState.errors.skorVokasional && (
                     <p className="text-destructive mt-2 text-sm font-medium">
-                      {form.formState.errors.skorVokasional.message}
+                      {
+                        (
+                          form.formState.errors.skorVokasional as {
+                            message?: string;
+                          }
+                        ).message
+                      }
                     </p>
                   )}
                 </FieldSet>
