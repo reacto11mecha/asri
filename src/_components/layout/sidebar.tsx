@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  Nfc,
   LayoutDashboard,
   Users,
   FileText,
@@ -12,6 +13,11 @@ import {
   ClipboardList,
 } from "lucide-react";
 import { cn } from "~/lib/utils";
+
+const appInputMenu = [
+  { name: "Scanner", href: "/scanner", icon: QrCode },
+  { name: "RFID Tap", href: "/rfid", icon: Nfc },
+];
 
 export function Sidebar({
   role,
@@ -66,8 +72,6 @@ export function Sidebar({
             },
           ];
 
-  const scannerMenu = { name: "Scanner", href: "/scanner", icon: QrCode };
-
   const isMenuActive = (href: string) => {
     if (href === "/dashboard") return pathname === "/dashboard";
     return pathname.startsWith(href);
@@ -109,20 +113,25 @@ export function Sidebar({
         </nav>
 
         {/* Separator dan Scanner di bawah menu utama */}
-        <div className="mt-4 px-2 lg:px-4">
+        <div className="mt-4 space-y-2 px-2 lg:px-4">
           <div className="mb-2 border-t" />
-          <Link
-            href={scannerMenu.href}
-            className={cn(
-              "flex items-center gap-3 rounded-lg px-3 py-2.5 transition-all",
-              isMenuActive(scannerMenu.href)
-                ? "bg-emerald-600 text-white shadow-md shadow-emerald-200 hover:bg-emerald-700"
-                : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100",
-            )}
-          >
-            <QrCode className="h-4 w-4" />
-            {scannerMenu.name}
-          </Link>
+          {appInputMenu.map((menu) => {
+            const Icon = menu.icon;
+
+            return (
+              <Link
+                key={menu.href}
+                href={menu.href}
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 transition-all",
+                  "bg-emerald-50 text-emerald-700 hover:bg-emerald-100",
+                )}
+              >
+                <Icon className="h-4 w-4" />
+                {menu.name}
+              </Link>
+            );
+          })}
         </div>
       </div>
     </div>
