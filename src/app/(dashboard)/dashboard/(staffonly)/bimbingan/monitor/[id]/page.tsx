@@ -42,6 +42,7 @@ import {
   MapPin,
   CalendarClock,
   ShieldCheck,
+  Info,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -200,8 +201,7 @@ export default function DetailMonitoringPage() {
             }
           >
             <SelectTrigger>
-              <SelectValue>
-                {/* Tampilkan "Semua" jika filterTahun === "all", selain itu tampilkan tahun */}
+              <SelectValue placeholder="Semua">
                 {filterTahun === "all" ? "Semua" : filterTahun}
               </SelectValue>
             </SelectTrigger>
@@ -227,8 +227,7 @@ export default function DetailMonitoringPage() {
             }
           >
             <SelectTrigger>
-              <SelectValue>
-                {/* Tampilkan "Semua" jika filterBulan === "all", selain itu tampilkan nama bulan */}
+              <SelectValue placeholder="Semua">
                 {filterBulan === "all"
                   ? "Semua"
                   : new Date(0, parseInt(filterBulan) - 1).toLocaleString(
@@ -354,6 +353,59 @@ export default function DetailMonitoringPage() {
               </p>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* --- KETERANGAN KRITERIA NILAI (BARU) --- */}
+      <Card className="bg-primary/5 border-primary/20">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-primary flex items-center gap-2 text-sm">
+            <Info className="h-4 w-4" /> Kriteria Rentang Penilaian
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+            <div className="space-y-1 text-xs">
+              <p className="font-semibold">ADL (Maks. 45)</p>
+              <ul className="text-muted-foreground space-y-0.5">
+                <li>0 - 9: Sangat Kurang</li>
+                <li>10 - 18: Kurang</li>
+                <li>19 - 27: Cukup</li>
+                <li>28 - 36: Baik</li>
+                <li>37 - 45: Sangat Baik</li>
+              </ul>
+            </div>
+            <div className="space-y-1 text-xs">
+              <p className="font-semibold">Sosial (Maks. 60)</p>
+              <ul className="text-muted-foreground space-y-0.5">
+                <li>0 - 12: Sangat Kurang</li>
+                <li>13 - 24: Kurang</li>
+                <li>25 - 36: Cukup</li>
+                <li>37 - 48: Baik</li>
+                <li>49 - 60: Sangat Baik</li>
+              </ul>
+            </div>
+            <div className="space-y-1 text-xs">
+              <p className="font-semibold">Mental (Maks. 90)</p>
+              <ul className="text-muted-foreground space-y-0.5">
+                <li>0 - 18: Sangat Kurang</li>
+                <li>19 - 36: Kurang</li>
+                <li>37 - 54: Cukup</li>
+                <li>55 - 72: Baik</li>
+                <li>73 - 90: Sangat Baik</li>
+              </ul>
+            </div>
+            <div className="space-y-1 text-xs">
+              <p className="font-semibold">Vokasional (Maks. 70)</p>
+              <ul className="text-muted-foreground space-y-0.5">
+                <li>0 - 14: Sangat Kurang</li>
+                <li>15 - 28: Kurang</li>
+                <li>29 - 42: Cukup</li>
+                <li>43 - 56: Baik</li>
+                <li>57 - 70: Sangat Baik</li>
+              </ul>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
