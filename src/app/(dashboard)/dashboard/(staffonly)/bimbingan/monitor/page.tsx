@@ -91,6 +91,7 @@ export default function MonitorListPage() {
     [daftarKelas, jenjang, tingkat],
   );
 
+  const selectedTingkatLabel = tingkat === "all" ? "Semua" : tingkat;
   const selectedKelasLabel =
     kelasId === "all"
       ? "Semua"
@@ -161,7 +162,11 @@ export default function MonitorListPage() {
               }}
             >
               <SelectTrigger className="w-[120px]">
-                <SelectValue />
+                {jenjang === "all" ? (
+                  <SelectValue>Semua</SelectValue>
+                ) : (
+                  <SelectValue />
+                )}
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Semua</SelectItem>
@@ -186,7 +191,7 @@ export default function MonitorListPage() {
                   }}
                 >
                   <SelectTrigger className="w-[120px]">
-                    <SelectValue placeholder="Semua" />
+                    <SelectValue>{selectedTingkatLabel}</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Semua</SelectItem>
@@ -202,6 +207,7 @@ export default function MonitorListPage() {
                 <label className="mb-1 block text-sm font-medium">Kelas</label>
                 <Select
                   value={kelasId}
+                  disabled={tingkat === "all"}
                   onValueChange={(v) => {
                     setKelasId(v ?? "all");
                     setPage(1);
@@ -244,7 +250,13 @@ export default function MonitorListPage() {
             }}
           >
             <SelectTrigger className="w-[150px]">
-              <SelectValue />
+              <SelectValue>
+                {statusFilter === "semua"
+                  ? "Semua Status"
+                  : statusFilter === "sudah"
+                    ? "Sudah Dievaluasi"
+                    : "Belum Dievaluasi"}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="semua">Semua Status</SelectItem>

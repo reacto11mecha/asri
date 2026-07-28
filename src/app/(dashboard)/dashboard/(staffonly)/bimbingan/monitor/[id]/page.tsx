@@ -190,6 +190,7 @@ export default function DetailMonitoringPage() {
 
       {/* --- FILTER CONTROL --- */}
       <div className="bg-muted/20 flex flex-col items-end gap-4 rounded-lg border p-4 sm:flex-row">
+        {/* Filter Tahun */}
         <div className="w-full flex-1 space-y-1.5 sm:max-w-xs">
           <label className="text-sm font-medium">Filter Tahun</label>
           <Select
@@ -199,10 +200,13 @@ export default function DetailMonitoringPage() {
             }
           >
             <SelectTrigger>
-              <SelectValue placeholder="Pilih Tahun" />
+              <SelectValue>
+                {/* Tampilkan "Semua" jika filterTahun === "all", selain itu tampilkan tahun */}
+                {filterTahun === "all" ? "Semua" : filterTahun}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Semua Tahun</SelectItem>
+              <SelectItem value="all">Semua</SelectItem>
               {daftarTahun.map((tahun) => (
                 <SelectItem key={tahun} value={tahun}>
                   {tahun}
@@ -211,19 +215,32 @@ export default function DetailMonitoringPage() {
             </SelectContent>
           </Select>
         </div>
+
+        {/* Filter Bulan */}
         <div className="w-full flex-1 space-y-1.5 sm:max-w-xs">
           <label className="text-sm font-medium">Filter Bulan</label>
           <Select
             value={filterBulan}
+            disabled={filterTahun === "all"}
             onValueChange={(bulan) =>
               setFilterBulan(!bulan || bulan === "" ? "all" : bulan)
             }
           >
             <SelectTrigger>
-              <SelectValue placeholder="Pilih Bulan" />
+              <SelectValue>
+                {/* Tampilkan "Semua" jika filterBulan === "all", selain itu tampilkan nama bulan */}
+                {filterBulan === "all"
+                  ? "Semua"
+                  : new Date(0, parseInt(filterBulan) - 1).toLocaleString(
+                      "id-ID",
+                      {
+                        month: "long",
+                      },
+                    )}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Semua Bulan</SelectItem>
+              <SelectItem value="all">Semua</SelectItem>
               {[
                 "01",
                 "02",
@@ -247,6 +264,8 @@ export default function DetailMonitoringPage() {
             </SelectContent>
           </Select>
         </div>
+
+        {/* Tombol Reset */}
         {(filterBulan !== "all" || filterTahun !== "all") && (
           <Button
             variant="ghost"
