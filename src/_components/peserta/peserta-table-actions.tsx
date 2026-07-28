@@ -4,6 +4,8 @@
 import { useState, useRef } from "react";
 import { api } from "~/trpc/react";
 import { Button } from "~/components/ui/button";
+import { cn } from "~/lib/utils";
+import { buttonVariants } from "~/components/ui/button";
 import {
   Plus,
   Upload,
@@ -12,6 +14,7 @@ import {
   Trash2,
   FileSpreadsheet,
   QrCode,
+  Camera,
 } from "lucide-react";
 import Link from "next/link";
 import type { InsertPesertaType } from "~/server/api/routers/peserta";
@@ -433,7 +436,7 @@ export function PesertaTableActions() {
         Gunakan template Excel untuk <i>bulk upload</i>.
       </div>
 
-      <div className="flex flex-wrap justify-end gap-2">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
         <input
           type="file"
           accept=".xlsx"
@@ -445,6 +448,7 @@ export function PesertaTableActions() {
         <Button variant="outline" onClick={handleDownloadTemplate}>
           <Download className="mr-2 h-4 w-4" /> Template Excel
         </Button>
+
         <Button
           variant="outline"
           className="border-primary/50 text-primary hover:bg-primary/10"
@@ -458,16 +462,26 @@ export function PesertaTableActions() {
           )}
           Import Excel
         </Button>
-        <Button
-          render={
-            <Link href="/dashboard/peserta/tambah">
-              <Plus className="mr-2 h-4 w-4" /> Tambah Manual
-            </Link>
-          }
-          nativeButton={false}
-        />
 
-        {/* Tombol Unduh Excel */}
+        <Link
+          href="/dashboard/peserta/tambah"
+          className={cn(buttonVariants(), "gap-2")}
+        >
+          <Plus className="h-4 w-4" />
+          Tambah Manual
+        </Link>
+
+        <Link
+          href="/dashboard/peserta/pairing"
+          className={cn(
+            buttonVariants({ variant: "outline" }),
+            "gap-2 border-blue-500 text-blue-600 hover:bg-blue-50",
+          )}
+        >
+          <Camera className="h-4 w-4" />
+          Pairing RFID
+        </Link>
+
         <Button
           variant="outline"
           onClick={() => excelMutation.mutate()}
@@ -481,7 +495,6 @@ export function PesertaTableActions() {
           Unduh Data Excel
         </Button>
 
-        {/* Tombol Unduh QR ZIP */}
         <Button
           variant="outline"
           onClick={() => setShowQrDialog(true)}
@@ -494,6 +507,7 @@ export function PesertaTableActions() {
           )}
           Unduh QR Code (ZIP)
         </Button>
+
         <Button
           variant="outline"
           className="border-red-500 text-red-600 hover:bg-red-50"

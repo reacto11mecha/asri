@@ -74,6 +74,7 @@ const formSchema = z.object({
   pekerjaanAyah: z.string().optional(),
   penghasilanAyah: z.string().optional(),
   nikAyah: z.string().optional(),
+  uidKartu: z.string().optional(),
 });
 
 type FieldConfig = {
@@ -190,6 +191,7 @@ export function EditPesertaForm({ initialData }: { initialData: any }) {
       pekerjaanAyah: initialData.pekerjaanAyah || "",
       penghasilanAyah: initialData.penghasilanAyah || "",
       nikAyah: initialData.nikAyah || "",
+      uidKartu: initialData.uidKartu || "",
     },
   });
 
@@ -364,6 +366,40 @@ export function EditPesertaForm({ initialData }: { initialData: any }) {
                       ))}
                     </SelectContent>
                   </Select>
+                  {fieldState.invalid && (
+                    <FieldError errors={[fieldState.error]} />
+                  )}
+                </Field>
+              )}
+            />
+
+            <Controller
+              name="uidKartu"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel htmlFor={field.name}>
+                    UID Kartu RFID (Opsional)
+                  </FieldLabel>
+                  <Input
+                    {...field}
+                    value={(field.value as string) || ""}
+                    id={field.name}
+                    autoComplete="off"
+                    placeholder="8 karakter hex, contoh: A1B2C3D4"
+                    aria-invalid={fieldState.invalid}
+                    onChange={(e) => {
+                      const cleaned = e.target.value
+                        .replace(/[^0-9A-Fa-f]/g, "")
+                        .toUpperCase()
+                        .slice(0, 8);
+                      field.onChange(cleaned);
+                    }}
+                  />
+                  <FieldDescription>
+                    Nomor seri kartu RFID untuk absensi tap. Otomatis
+                    dibersihkan.
+                  </FieldDescription>
                   {fieldState.invalid && (
                     <FieldError errors={[fieldState.error]} />
                   )}

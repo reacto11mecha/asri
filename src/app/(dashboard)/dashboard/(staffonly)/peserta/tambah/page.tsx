@@ -52,6 +52,7 @@ const formSchema = z.object({
   agama: agamaEnum, // wajib pilih
   waliAsuhId: z.string().optional(),
   nisn: z.string().optional(),
+  uidKartu: z.string().optional(),
   jenisKelamin: z.string().optional(),
   tempatLahir: z.string().optional(),
   tanggalLahir: z.string().optional(),
@@ -337,6 +338,40 @@ export default function TambahPesertaPage() {
                       ))}
                     </SelectContent>
                   </Select>
+                  {fieldState.invalid && (
+                    <FieldError errors={[fieldState.error]} />
+                  )}
+                </Field>
+              )}
+            />
+
+            <Controller
+              name="uidKartu"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel htmlFor={field.name}>
+                    UID Kartu RFID (Opsional)
+                  </FieldLabel>
+                  <Input
+                    {...field}
+                    value={(field.value as string) || ""}
+                    id={field.name}
+                    autoComplete="off"
+                    placeholder="8 karakter hex, contoh: A1B2C3D4"
+                    aria-invalid={fieldState.invalid}
+                    onChange={(e) => {
+                      const cleaned = e.target.value
+                        .replace(/[^0-9A-Fa-f]/g, "")
+                        .toUpperCase()
+                        .slice(0, 8);
+                      field.onChange(cleaned);
+                    }}
+                  />
+                  <FieldDescription>
+                    Nomor seri kartu RFID untuk absensi tap. Otomatis
+                    dibersihkan.
+                  </FieldDescription>
                   {fieldState.invalid && (
                     <FieldError errors={[fieldState.error]} />
                   )}
