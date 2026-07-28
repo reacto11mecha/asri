@@ -11,6 +11,7 @@ import {
   kelas,
   user,
 } from "~/server/db/schema";
+import type { ScanResult } from "~/types/scan";
 
 // Enum untuk opsi filter
 const statusKehadiranEnum = z.enum([
@@ -419,5 +420,91 @@ export const aktivitasRouter = createTRPCRouter({
       }
 
       return peserta;
+    }),
+
+  scanRfid: protectedProcedure
+    .input(
+      z.object({
+        uidKartu: z.string().length(8),
+        sesiId: z.string(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      // 1. Cari siswa berdasarkan uidKartu
+      const peserta = await ctx.db.query.pesertaDidik.findFirst({
+        where: eq(pesertaDidik.uidKartu, input.uidKartu.toUpperCase()),
+        with: { kelas: true },
+      });
+      if (!peserta) throw new Error("Kartu tidak dikenali / belum terdaftar.");
+
+      // 2. Cari sesi
+      const sesi = await ctx.db.query.sesiAbsensi.findFirst({
+        where: eq(sesiAbsensi.id, input.sesiId),
+      });
+      if (!sesi) throw new Error("Sesi jadwal tidak valid.");
+
+      // 3. Validasi target jenjang & agama
+      if (!sesi.targetJenjang.includes(peserta.kelas.jenjang))
+        throw new Error(
+          `Siswa jenjang ${peserta.kelas.jenjang} tidak ditugaskan pada sesi ini.`,
+        );
+
+      if (!sesi.targetAgama.includes(peserta.agama))
+        throw new Error(
+          `Sesi ini tidak diperuntukkan bagi peserta beragama ${peserta.agama}.`,
+        );
+
+      // 4. Kalkulasi waktu dan poin
+      const now = new Date();
+      const currentTimeString = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}:${now.getSeconds().toString().padStart(2, "0")}`;
+      let statusWaktu: "TEPAT_WAKTU" | "TELAT" = "TEPAT_WAKTU";
+      let poin = sesi.poinTepatWaktu;
+
+      if (sesi.waktuSelesai && currentTimeString > sesi.waktuSelesai) {
+        statusWaktu = "TELAT";
+        poin = sesi.poinTelat;
+      }
+
+      // 5. Tanggal bisnis
+      const businessDate = new Date(now);
+      if (now.getHours() < 3) businessDate.setDate(businessDate.getDate() - 1);
+      const tanggalFormat = businessDate.toISOString().split("T")[0]!;
+
+      // 6. Cek duplikasi
+      const existing = await ctx.db.query.logAbsensi.findFirst({
+        where: and(
+          eq(logAbsensi.pesertaDidikId, peserta.id),
+          eq(logAbsensi.sesiId, sesi.id),
+          eq(logAbsensi.tanggal, tanggalFormat),
+        ),
+      });
+      if (existing)
+        throw new Error(
+          `Siswa atas nama ${peserta.namaLengkap} sudah diabsen pada sesi ini.`,
+        );
+
+      // 7. Simpan log
+      await ctx.db.insert(logAbsensi).values({
+        pesertaDidikId: peserta.id,
+        sesiId: sesi.id,
+        pelanggaranId: null,
+        waliAsuhId: ctx.session.user.id,
+        tanggal: tanggalFormat,
+        waktuScan: now,
+        statusKehadiran: "HADIR",
+        statusWaktu,
+        poinDidapat: poin,
+        isPoinManual: false,
+      });
+
+      return {
+        id: peserta.id,
+        namaLengkap: peserta.namaLengkap,
+        kelas: {
+          tingkat: peserta.kelas.tingkat,
+          namaKelas: peserta.kelas.namaKelas,
+          jenjang: peserta.kelas.jenjang,
+        },
+      } satisfies ScanResult;
     }),
 });

@@ -370,7 +370,8 @@ export default function ScannerPage() {
               {scanData?.namaLengkap}
             </p>
             <p className="mt-2 text-lg opacity-90">
-              {scanData?.kelas?.tingkat} {scanData?.kelas?.namaKelas} ({scanData?.kelas?.jenjang})
+              {scanData?.kelas?.tingkat} {scanData?.kelas?.namaKelas} (
+              {scanData?.kelas?.jenjang})
             </p>
           </div>
         )}
