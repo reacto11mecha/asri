@@ -1,50 +1,104 @@
 // src/server/api/routers/bimbingan.ts
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { monitoringPerkembangan, penangananKasus } from "~/server/db/schema";
-import { eq, desc, asc } from "drizzle-orm";
+import { createTRPCRouter, staffProcedure } from "~/server/api/trpc";
+import {
+  monitoringPerkembangan,
+  penangananKasus,
+  pesertaDidik,
+  kelas,
+  user,
+} from "~/server/db/schema";
+import {
+  eq,
+  desc,
+  asc,
+  and,
+  ilike,
+  gte,
+  lte,
+  count,
+  inArray,
+  sql,
+} from "drizzle-orm";
 
 export const bimbinganRouter = createTRPCRouter({
-  // ===============================================
-  // MANAJEMEN MONITORING PERKEMBANGAN PESERTA DIDIK
-  // ===============================================
-
   // ==========================================
-  // 1. ENDPOINT UNTUK HALAMAN DAFTAR MONITORING (TABEL & INSIGHT)
+  // MONITORING PERKEMBANGAN
   // ==========================================
-  getOverviewMonitoring: protectedProcedure
+  getOverviewMonitoring: staffProcedure
     .input(
       z.object({
         jenjang: z.enum(["SD", "SMP", "SMA"]).optional(),
         tingkat: z.string().optional(),
         kelasId: z.string().optional(),
+        search: z.string().optional(),
+        statusEvaluasi: z
+          .enum(["semua", "sudah", "belum"])
+          .optional()
+          .default("semua"),
+        page: z.number().min(1).optional().default(1),
+        limit: z.number().min(5).max(100).optional().default(10),
       }),
     )
     .query(async ({ ctx, input }) => {
-      // Ambil daftar siswa beserta relasi kelas dan 1 rapor terakhir
-      const daftarSiswa = await ctx.db.query.pesertaDidik.findMany({
-        where: (peserta, { and, eq }) => {
-          const conditions = [eq(peserta.status, "AKTIF")];
-          if (input.kelasId)
-            conditions.push(eq(peserta.kelasId, input.kelasId));
-          return and(...conditions);
-        },
-        with: {
-          kelas: true,
-          riwayatPerkembangan: {
-            orderBy: (rapor, { desc }) => [desc(rapor.createdAt)],
-            limit: 1, // Hanya ambil data paling mutakhir untuk tabel & insight
-          },
-        },
-      });
+      const conditions = [eq(pesertaDidik.status, "AKTIF")];
 
-      // Filter tambahan secara in-memory untuk jenjang & tingkat jika kelasId tidak diset
-      const filteredSiswa = daftarSiswa.filter((s) => {
-        let match = true;
-        if (input.jenjang && s.kelas.jenjang !== input.jenjang) match = false;
-        if (input.tingkat && s.kelas.tingkat !== input.tingkat) match = false;
-        return match;
-      });
+      if (input.kelasId) {
+        conditions.push(eq(pesertaDidik.kelasId, input.kelasId));
+      }
+      if (input.jenjang) {
+        conditions.push(eq(kelas.jenjang, input.jenjang));
+      }
+      if (input.tingkat) {
+        conditions.push(eq(kelas.tingkat, input.tingkat));
+      }
+
+      if (input.search) {
+        conditions.push(ilike(pesertaDidik.namaLengkap, `%${input.search}%`));
+      }
+
+      const daftarSiswa = await ctx.db
+        .select({
+          id: pesertaDidik.id,
+          namaLengkap: pesertaDidik.namaLengkap,
+          kelas: {
+            tingkat: kelas.tingkat,
+            namaKelas: kelas.namaKelas,
+            jenjang: kelas.jenjang,
+          },
+        })
+        .from(pesertaDidik)
+        .innerJoin(kelas, eq(pesertaDidik.kelasId, kelas.id))
+        .where(and(...conditions))
+        .orderBy(
+          asc(kelas.jenjang),
+          asc(kelas.tingkat),
+          asc(kelas.namaKelas),
+          asc(pesertaDidik.namaLengkap),
+        );
+
+      // Ambil rapor terakhir untuk setiap siswa
+      const siswaIds = daftarSiswa.map((s) => s.id);
+      const raporTerakhir = await ctx.db
+        .selectDistinctOn([monitoringPerkembangan.pesertaDidikId], {
+          pesertaDidikId: monitoringPerkembangan.pesertaDidikId,
+          totalSkorAdl: monitoringPerkembangan.totalSkorAdl,
+          totalSkorSosial: monitoringPerkembangan.totalSkorSosial,
+          totalSkorMental: monitoringPerkembangan.totalSkorMental,
+          totalSkorVokasional: monitoringPerkembangan.totalSkorVokasional,
+          totalSkorKeseluruhan: monitoringPerkembangan.totalSkorKeseluruhan,
+          periodeBulan: monitoringPerkembangan.periodeBulan,
+          periodeTahun: monitoringPerkembangan.periodeTahun,
+          createdAt: monitoringPerkembangan.createdAt,
+        })
+        .from(monitoringPerkembangan)
+        .where(inArray(monitoringPerkembangan.pesertaDidikId, siswaIds))
+        .orderBy(
+          monitoringPerkembangan.pesertaDidikId,
+          desc(monitoringPerkembangan.createdAt),
+        );
+
+      const raporMap = new Map(raporTerakhir.map((r) => [r.pesertaDidikId, r]));
 
       const currentMonth = (new Date().getMonth() + 1)
         .toString()
@@ -57,34 +111,51 @@ export const bimbinganRouter = createTRPCRouter({
         peringatan: string[];
       }> = [];
 
-      const tabelData = filteredSiswa.map((siswa) => {
-        const raporTerakhir = siswa.riwayatPerkembangan[0];
+      // 1. Definisikan tipe data secara ketat (Strict Type)
+      type TabelDataRow = {
+        id: string;
+        namaLengkap: string;
+        kelas: string;
+        statusEvaluasi: string;
+        skorTerakhir: number | null;
+        periodeTerakhir: string;
+      };
 
+      // 2. Gunakan tipe tersebut pada parameter generik reduce
+      const allData = daftarSiswa.reduce<TabelDataRow[]>((acc, siswa) => {
+        const rapor = raporMap.get(siswa.id);
         let statusEvaluasi = "Belum Dievaluasi";
+
         if (
-          raporTerakhir &&
-          raporTerakhir.periodeBulan === currentMonth &&
-          raporTerakhir.periodeTahun === currentYear
+          rapor &&
+          rapor.periodeBulan === currentMonth &&
+          rapor.periodeTahun === currentYear
         ) {
           statusEvaluasi = "Sudah Dievaluasi";
         }
 
-        // --- SISTEM INSIGHT (Berdasarkan PDF Form Monitoring) ---
-        // Jika rapor terakhir masuk kategori Kurang / Sangat Kurang
-        if (raporTerakhir) {
-          const peringatan: string[] = [];
+        // Terapkan filter status
+        if (
+          input.statusEvaluasi === "sudah" &&
+          statusEvaluasi !== "Sudah Dievaluasi"
+        )
+          return acc;
+        if (
+          input.statusEvaluasi === "belum" &&
+          statusEvaluasi !== "Belum Dievaluasi"
+        )
+          return acc;
 
-          // Ambang batas kategori "Kurang" berdasarkan form PDF
-          if (raporTerakhir.totalSkorAdl <= 18)
-            peringatan.push(`ADL (${raporTerakhir.totalSkorAdl})`);
-          if (raporTerakhir.totalSkorSosial <= 24)
-            peringatan.push(`Sosial (${raporTerakhir.totalSkorSosial})`);
-          if (raporTerakhir.totalSkorMental <= 36)
-            peringatan.push(`Mental (${raporTerakhir.totalSkorMental})`);
-          if (raporTerakhir.totalSkorVokasional <= 28)
-            peringatan.push(
-              `Vokasional (${raporTerakhir.totalSkorVokasional})`,
-            );
+        if (rapor) {
+          const peringatan: string[] = [];
+          if (rapor.totalSkorAdl <= 18)
+            peringatan.push(`ADL (${rapor.totalSkorAdl})`);
+          if (rapor.totalSkorSosial <= 24)
+            peringatan.push(`Sosial (${rapor.totalSkorSosial})`);
+          if (rapor.totalSkorMental <= 36)
+            peringatan.push(`Mental (${rapor.totalSkorMental})`);
+          if (rapor.totalSkorVokasional <= 28)
+            peringatan.push(`Vokasional (${rapor.totalSkorVokasional})`);
 
           if (peringatan.length > 0) {
             insightKritis.push({
@@ -95,56 +166,151 @@ export const bimbinganRouter = createTRPCRouter({
           }
         }
 
-        return {
+        acc.push({
           id: siswa.id,
           namaLengkap: siswa.namaLengkap,
-          kelas: `${siswa.kelas.tingkat} ${siswa.kelas.namaKelas}`,
+          kelas: `${siswa.kelas.tingkat} ${siswa.kelas.namaKelas} (${siswa.kelas.jenjang})`,
           statusEvaluasi,
-          skorTerakhir: raporTerakhir?.totalSkorKeseluruhan ?? null,
-          periodeTerakhir: raporTerakhir
-            ? `${raporTerakhir.periodeBulan}/${raporTerakhir.periodeTahun}`
+          skorTerakhir: rapor?.totalSkorKeseluruhan ?? null,
+          periodeTerakhir: rapor
+            ? `${rapor.periodeBulan}/${rapor.periodeTahun}`
             : "-",
-        };
-      });
+        });
+
+        return acc;
+      }, []);
+
+      // 3. Hitung pagination
+      const totalCount = allData.length;
+      const totalPages = Math.ceil(totalCount / input.limit);
+      const offset = (input.page - 1) * input.limit;
+      const tabelData = allData.slice(offset, offset + input.limit);
+
+      return { tabelData, insightKritis, totalCount, totalPages };
+    }),
+
+  // ==========================================
+  // DAFTAR KASUS (dengan filter & pagination)
+  // ==========================================
+  getDaftarKasus: staffProcedure
+    .input(
+      z.object({
+        status: z
+          .enum(["aktif", "selesai", "semua"])
+          .optional()
+          .default("semua"),
+        search: z.string().optional(),
+        tanggalMulai: z.string().optional(),
+        tanggalSelesai: z.string().optional(),
+        waliAsuhId: z.string().optional(),
+        page: z.number().min(1).optional().default(1),
+        limit: z.number().min(5).max(100).optional().default(10),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      const conditions = [];
+
+      if (input.status === "aktif") {
+        conditions.push(sql`${penangananKasus.tanggalTutup} IS NULL`);
+      } else if (input.status === "selesai") {
+        conditions.push(sql`${penangananKasus.tanggalTutup} IS NOT NULL`);
+      }
+
+      if (input.search) {
+        conditions.push(ilike(pesertaDidik.namaLengkap, `%${input.search}%`));
+      }
+
+      if (input.tanggalMulai) {
+        conditions.push(gte(penangananKasus.tanggalBuka, input.tanggalMulai));
+      }
+      if (input.tanggalSelesai) {
+        conditions.push(lte(penangananKasus.tanggalBuka, input.tanggalSelesai));
+      }
+
+      if (input.waliAsuhId) {
+        conditions.push(eq(pesertaDidik.waliAsuhId, input.waliAsuhId));
+      }
+
+      const where = conditions.length > 0 ? and(...conditions) : undefined;
+
+      const baseQuery = ctx.db
+        .select({ count: count() })
+        .from(penangananKasus)
+        .innerJoin(
+          pesertaDidik,
+          eq(penangananKasus.pesertaDidikId, pesertaDidik.id),
+        )
+        .where(where);
+
+      const [totalResult] = await baseQuery;
+      const totalCount = totalResult?.count ?? 0;
+      const totalPages = Math.ceil(totalCount / input.limit);
+      const offset = (input.page - 1) * input.limit;
+
+      const kasusList = await ctx.db
+        .select({
+          id: penangananKasus.id,
+          tanggalBuka: penangananKasus.tanggalBuka,
+          tanggalTutup: penangananKasus.tanggalTutup,
+          masalahUtama: penangananKasus.masalahUtama,
+          pesertaDidikId: pesertaDidik.id,
+          namaPeserta: pesertaDidik.namaLengkap,
+          tingkatKelas: kelas.tingkat,
+          namaKelas: kelas.namaKelas,
+          namaWaliAsuh: user.name,
+        })
+        .from(penangananKasus)
+        .innerJoin(
+          pesertaDidik,
+          eq(penangananKasus.pesertaDidikId, pesertaDidik.id),
+        )
+        .innerJoin(kelas, eq(pesertaDidik.kelasId, kelas.id))
+        .leftJoin(user, eq(pesertaDidik.waliAsuhId, user.id))
+        .where(where)
+        .orderBy(desc(penangananKasus.tanggalBuka))
+        .limit(input.limit)
+        .offset(offset);
 
       return {
-        tabelData,
-        insightKritis,
+        data: kasusList,
+        totalCount,
+        totalPages,
+        page: input.page,
+        limit: input.limit,
       };
     }),
 
   // ==========================================
-  // 2. ENDPOINT UNTUK HALAMAN DETAIL/CHART PESERTA
+  // CRUD & DETAIL (sama seperti sebelumnya, hanya ubah prosedur)
   // ==========================================
-  getDetailRiwayat: protectedProcedure
+  getDetailRiwayat: staffProcedure
     .input(z.object({ pesertaDidikId: z.string() }))
     .query(async ({ ctx, input }) => {
-      // Ambil seluruh riwayat urut dari Monev pertama ke terakhir (ASC) agar cocok untuk Chart
-      const riwayat = await ctx.db.query.monitoringPerkembangan.findMany({
+      return await ctx.db.query.monitoringPerkembangan.findMany({
         where: eq(monitoringPerkembangan.pesertaDidikId, input.pesertaDidikId),
         orderBy: [asc(monitoringPerkembangan.monevKe)],
+        with: {
+          author: {
+            columns: {
+              name: true,
+              image: true,
+            },
+          },
+        },
       });
-
-      // Data siap di-mapping oleh komponen frontend Recharts/Chart.js
-      return riwayat;
     }),
 
-  // ==========================================
-  // 3. ENDPOINT CREATE (Otomatis hitung total)
-  // ==========================================
-  createPerkembangan: protectedProcedure
+  createPerkembangan: staffProcedure
     .input(
       z.object({
         pesertaDidikId: z.string(),
         monevKe: z.number().min(1),
         periodeBulan: z.string().length(2),
         periodeTahun: z.string().length(4),
-
         skorAdl: z.record(z.string(), z.number()).optional(),
         skorSosial: z.record(z.string(), z.number()).optional(),
         skorMental: z.record(z.string(), z.number()).optional(),
         skorVokasional: z.record(z.string(), z.number()).optional(),
-
         masalahKasus: z.string().optional(),
         penyebabKasus: z.string().optional(),
         akibatKasus: z.string().optional(),
@@ -182,19 +348,17 @@ export const bimbinganRouter = createTRPCRouter({
       return newRapor;
     }),
 
-  // ==========================================
-  // 4. ENDPOINT UPDATE (Kalkulasi ulang total jika ada perubahan)
-  // ==========================================
-  updatePerkembangan: protectedProcedure
+  updatePerkembangan: staffProcedure
     .input(
       z.object({
         id: z.string(),
-        // Semua record opsional, kirim hanya yang diubah
+        monevKe: z.number().min(1),
+        periodeBulan: z.string().length(2),
+        periodeTahun: z.string().length(4),
         skorAdl: z.record(z.string(), z.number()).optional(),
         skorSosial: z.record(z.string(), z.number()).optional(),
         skorMental: z.record(z.string(), z.number()).optional(),
         skorVokasional: z.record(z.string(), z.number()).optional(),
-
         masalahKasus: z.string().optional(),
         penyebabKasus: z.string().optional(),
         akibatKasus: z.string().optional(),
@@ -209,10 +373,8 @@ export const bimbinganRouter = createTRPCRouter({
       const existingData = await ctx.db.query.monitoringPerkembangan.findFirst({
         where: eq(monitoringPerkembangan.id, id),
       });
+      if (!existingData) throw new Error("Rapor tidak ditemukan");
 
-      if (!existingData) throw new Error("Rapor perkembangan tidak ditemukan");
-
-      // Gabungkan data lama dan baru
       const mergedAdl =
         updateData.skorAdl ??
         (existingData.skorAdl as Record<string, number> | undefined);
@@ -236,7 +398,7 @@ export const bimbinganRouter = createTRPCRouter({
       const totalSkorKeseluruhan =
         totalSkorAdl + totalSkorSosial + totalSkorMental + totalSkorVokasional;
 
-      const [updatedRapor] = await ctx.db
+      const [updated] = await ctx.db
         .update(monitoringPerkembangan)
         .set({
           ...updateData,
@@ -249,38 +411,42 @@ export const bimbinganRouter = createTRPCRouter({
         .where(eq(monitoringPerkembangan.id, id))
         .returning();
 
-      return updatedRapor;
+      return updated;
     }),
 
-  // ==========================================
-  // MANAJEMEN PENANGANAN KASUS
-  // ==========================================
-
-  getDaftarKasus: protectedProcedure
-    .input(z.object({ pesertaDidikId: z.string().optional() }))
+  getDetailKasus: staffProcedure
+    .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
-      return await ctx.db.query.penangananKasus.findMany({
-        where: input.pesertaDidikId
-          ? eq(penangananKasus.pesertaDidikId, input.pesertaDidikId)
-          : undefined,
+      const kasus = await ctx.db.query.penangananKasus.findFirst({
+        where: eq(penangananKasus.id, input.id),
         with: {
           pesertaDidik: {
-            columns: { namaLengkap: true, kelasId: true },
             with: {
-              waliAsuh: { columns: { name: true } }, // Tarik nama Wali Asuh untuk UI/PDF
-              kelas: { columns: { tingkat: true, namaKelas: true } },
+              kelas: true,
+              waliAsuh: { columns: { name: true } },
             },
           },
         },
-        orderBy: [desc(penangananKasus.createdAt)],
       });
+      if (!kasus) throw new Error("Kasus tidak ditemukan");
+
+      const tindakLanjut = (kasus.intervensi || []).map((item) => {
+        const match = item.deskripsi.match(/^\[(.*?)\]\s(.*)$/);
+        return {
+          id: item.aktivitasKe.toString(),
+          tanggalTindakan: match ? match[1] : kasus.tanggalBuka,
+          deskripsi: match ? match[2] : item.deskripsi,
+        };
+      });
+
+      return { ...kasus, tindakLanjut };
     }),
 
-  createKasus: protectedProcedure
+  createKasus: staffProcedure
     .input(
       z.object({
         pesertaDidikId: z.string().min(1, "Siswa harus dipilih"),
-        tanggalBuka: z.string(), // Biarkan sebagai string YYYY-MM-DD
+        tanggalBuka: z.string(),
         masalahUtama: z.string().optional(),
         penyebabMasalah: z.string().optional(),
         dampakBiologis: z.string().optional(),
@@ -290,32 +456,31 @@ export const bimbinganRouter = createTRPCRouter({
         tujuanUmum: z.string().optional(),
         tujuanKhusus: z.array(z.string()).optional(),
         rencanaKegiatan: z.array(z.string()).optional(),
+        intervensiAwal: z
+          .array(z.object({ aktivitasKe: z.number(), deskripsi: z.string() }))
+          .optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
       const authorId = ctx.session.user.id;
-
-      // 2. Insert data langsung karena input.tanggalBuka sudah string
       const [newKasus] = await ctx.db
         .insert(penangananKasus)
         .values({
           ...input,
-          authorId, // Akuntabilitas user yang login
-          tanggalTutup: null, // Default null untuk string
-          intervensi: [],
+          authorId,
+          tanggalTutup: null,
+          intervensi: input.intervensiAwal || [],
           hasilMonev: [],
           metodeMonev: [],
         })
         .returning();
-
       return newKasus;
     }),
 
-  updateKasus: protectedProcedure
+  updateKasus: staffProcedure
     .input(
       z.object({
         id: z.string(),
-        tanggalTutup: z.string().optional().nullable(),
         masalahUtama: z.string().optional(),
         penyebabMasalah: z.string().optional(),
         dampakBiologis: z.string().optional(),
@@ -325,29 +490,32 @@ export const bimbinganRouter = createTRPCRouter({
         tujuanUmum: z.string().optional(),
         tujuanKhusus: z.array(z.string()).optional(),
         rencanaKegiatan: z.array(z.string()).optional(),
+        intervensi: z
+          .array(z.object({ aktivitasKe: z.number(), deskripsi: z.string() }))
+          .optional(),
+        metodeMonev: z.array(z.string()).optional(),
+        hasilMonev: z
+          .array(z.object({ mingguKe: z.number(), deskripsi: z.string() }))
+          .optional(),
         terminasiBiologis: z.string().optional(),
         terminasiPsikologis: z.string().optional(),
         terminasiSosial: z.string().optional(),
         terminasiSpiritual: z.string().optional(),
         kesimpulan: z.string().optional(),
+        tanggalTutup: z.string().optional().nullable(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
       const { id, ...updateData } = input;
-
-      const [updatedKasus] = await ctx.db
+      const [updated] = await ctx.db
         .update(penangananKasus)
         .set(updateData)
         .where(eq(penangananKasus.id, id))
         .returning();
-
-      return updatedKasus;
+      return updated;
     }),
 
-  // ==========================================
-  // ARRAY UPDATES (Intervensi & Monev)
-  // ==========================================
-  addIntervensiKasus: protectedProcedure
+  addIntervensiKasus: staffProcedure
     .input(
       z.object({
         kasusId: z.string(),
@@ -361,10 +529,8 @@ export const bimbinganRouter = createTRPCRouter({
       });
       if (!kasus) throw new Error("Kasus tidak ditemukan");
 
-      const existingIntervensi = kasus.intervensi || [];
-
-      // Jika user mengedit aktivitas yang sudah ada, filter dulu
-      const filtered = existingIntervensi.filter(
+      const existing = kasus.intervensi || [];
+      const filtered = existing.filter(
         (i) => i.aktivitasKe !== input.aktivitasKe,
       );
       filtered.push({
@@ -373,13 +539,15 @@ export const bimbinganRouter = createTRPCRouter({
       });
       filtered.sort((a, b) => a.aktivitasKe - b.aktivitasKe);
 
-      return await ctx.db
+      await ctx.db
         .update(penangananKasus)
         .set({ intervensi: filtered })
         .where(eq(penangananKasus.id, input.kasusId));
+
+      return { success: true };
     }),
 
-  addHasilMonev: protectedProcedure
+  addHasilMonev: staffProcedure
     .input(
       z.object({
         kasusId: z.string(),
@@ -393,18 +561,58 @@ export const bimbinganRouter = createTRPCRouter({
       });
       if (!kasus) throw new Error("Kasus tidak ditemukan");
 
-      const existingMonev = kasus.hasilMonev || [];
-
-      // Filter minggu yang sama untuk mode edit
-      const filtered = existingMonev.filter(
-        (m) => m.mingguKe !== input.mingguKe,
-      );
+      const existing = kasus.hasilMonev || [];
+      const filtered = existing.filter((m) => m.mingguKe !== input.mingguKe);
       filtered.push({ mingguKe: input.mingguKe, deskripsi: input.deskripsi });
       filtered.sort((a, b) => a.mingguKe - b.mingguKe);
 
-      return await ctx.db
+      await ctx.db
         .update(penangananKasus)
         .set({ hasilMonev: filtered })
         .where(eq(penangananKasus.id, input.kasusId));
+
+      return { success: true };
+    }),
+
+  tambahTindakLanjut: staffProcedure
+    .input(
+      z.object({
+        kasusId: z.string(),
+        tanggalTindakan: z.string(),
+        deskripsi: z.string(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const kasus = await ctx.db.query.penangananKasus.findFirst({
+        where: eq(penangananKasus.id, input.kasusId),
+      });
+      if (!kasus) throw new Error("Kasus tidak ditemukan");
+
+      const existing = kasus.intervensi || [];
+      const nextAktivitasKe =
+        existing.length > 0
+          ? Math.max(...existing.map((i) => i.aktivitasKe)) + 1
+          : 1;
+      const combined = `[${input.tanggalTindakan}] ${input.deskripsi}`;
+      existing.push({ aktivitasKe: nextAktivitasKe, deskripsi: combined });
+
+      await ctx.db
+        .update(penangananKasus)
+        .set({ intervensi: existing })
+        .where(eq(penangananKasus.id, input.kasusId));
+
+      return { success: true };
+    }),
+
+  tutupKasus: staffProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const today = new Date().toISOString().split("T")[0];
+      await ctx.db
+        .update(penangananKasus)
+        .set({ tanggalTutup: today })
+        .where(eq(penangananKasus.id, input.id));
+
+      return { success: true };
     }),
 });

@@ -98,6 +98,32 @@ export const pesertaRouter = createTRPCRouter({
       }));
     }),
 
+  getById: staffProcedure
+    .input(
+      z.object({
+        id: z.string().min(1, "ID Peserta Didik tidak boleh kosong"),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      const peserta = await ctx.db.query.pesertaDidik.findFirst({
+        where: eq(pesertaDidik.id, input.id),
+        with: {
+          kelas: true,
+          waliAsuh: {
+            columns: {
+              name: true,
+            },
+          },
+        },
+      });
+
+      if (!peserta) {
+        throw new Error("Data peserta didik tidak ditemukan");
+      }
+
+      return peserta;
+    }),
+
   assignWaliAsuh: staffProcedure
     .input(
       z.object({
