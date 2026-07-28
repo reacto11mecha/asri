@@ -140,7 +140,7 @@ export function EditPesertaForm({ initialData }: { initialData: any }) {
   const { data: daftarWali = [], isLoading: loadingWali } =
     api.peserta.getWaliAsuh.useQuery();
 
-  const pairRfidPesertaMutation = api.peserta.pairRfid.useMutation({
+  const updatePesertaMutation = api.peserta.updatePeserta.useMutation({
     onSuccess: async () => {
       await utils.peserta.getAll.invalidate();
       router.push("/dashboard/peserta");
@@ -196,7 +196,7 @@ export function EditPesertaForm({ initialData }: { initialData: any }) {
   });
 
   function onSubmit(data: z.infer<typeof formSchema>) {
-    pairRfidPesertaMutation.mutate(data);
+    updatePesertaMutation.mutate(data);
   }
 
   const renderFields = (fields: FieldConfig[]) =>
@@ -539,8 +539,8 @@ export function EditPesertaForm({ initialData }: { initialData: any }) {
           <Button type="button" variant="ghost" onClick={() => router.back()}>
             Batal
           </Button>
-          <Button type="submit" disabled={pairRfidPesertaMutation.isPending}>
-            {pairRfidPesertaMutation.isPending ? (
+          <Button type="submit" disabled={updatePesertaMutation.isPending}>
+            {updatePesertaMutation.isPending ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
               <Save className="mr-2 h-4 w-4" />
