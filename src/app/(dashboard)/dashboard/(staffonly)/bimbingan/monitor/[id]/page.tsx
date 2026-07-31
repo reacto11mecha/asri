@@ -43,6 +43,7 @@ import {
   CalendarClock,
   ShieldCheck,
   Info,
+  FileText,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -55,6 +56,8 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
+
+import { generateMonevPDF } from "~/lib/generate-monev-pdf";
 
 export default function DetailMonitoringPage() {
   const params = useParams();
@@ -356,7 +359,7 @@ export default function DetailMonitoringPage() {
         </CardContent>
       </Card>
 
-      {/* --- KETERANGAN KRITERIA NILAI (BARU) --- */}
+      {/* --- KETERANGAN KRITERIA NILAI --- */}
       <Card className="bg-primary/5 border-primary/20">
         <CardHeader className="pb-3">
           <CardTitle className="text-primary flex items-center gap-2 text-sm">
@@ -420,7 +423,7 @@ export default function DetailMonitoringPage() {
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto rounded-md border">
-            <Table className="min-w-[900px]">
+            <Table className="min-w-[1000px]">
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[120px]">Periode Monev</TableHead>
@@ -468,7 +471,6 @@ export default function DetailMonitoringPage() {
                         </div>
                       </TableCell>
 
-                      {/* INFORMASI AUTHOR DENGAN AVATAR */}
                       <TableCell>
                         <div className="flex items-center gap-2 text-sm font-medium">
                           {item.author ? (
@@ -516,19 +518,31 @@ export default function DetailMonitoringPage() {
                       </TableCell>
 
                       <TableCell className="text-right">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-8"
-                          render={
-                            <Link
-                              href={`/dashboard/bimbingan/monitor/${pesertaDidikId}/edit/${item.id}`}
-                            >
-                              <Pencil className="mr-2 h-3.5 w-3.5" /> Edit
-                            </Link>
-                          }
-                          nativeButton={false}
-                        />
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8"
+                            onClick={() =>
+                              generateMonevPDF(item as any, profil as any)
+                            }
+                          >
+                            <FileText className="mr-2 h-3.5 w-3.5" /> Cetak
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8"
+                            render={
+                              <Link
+                                href={`/dashboard/bimbingan/monitor/${pesertaDidikId}/edit/${item.id}`}
+                              >
+                                <Pencil className="mr-2 h-3.5 w-3.5" /> Edit
+                              </Link>
+                            }
+                            nativeButton={false}
+                          />
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
