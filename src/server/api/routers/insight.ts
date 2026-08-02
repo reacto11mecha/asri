@@ -235,63 +235,61 @@ export const insightRouter = createTRPCRouter({
         );
 
       // Struktur hasil: per sesi, siswa bermasalah
-      const hasilAkhir = grouped
-        .map(({ sesi, pesertaSesi }) => {
-          const siswaBermasalah: any[] = [];
+      const hasilAkhir = grouped.map(({ sesi, pesertaSesi }) => {
+        const siswaBermasalah: any[] = [];
 
-          for (const peserta of pesertaSesi) {
-            const log = allLogs.find(
-              (l) => l.sesiId === sesi.id && l.pesertaDidikId === peserta.id,
-            );
+        for (const peserta of pesertaSesi) {
+          const log = allLogs.find(
+            (l) => l.sesiId === sesi.id && l.pesertaDidikId === peserta.id,
+          );
 
-            let statusKehadiran = log?.statusKehadiran ?? "ALFA";
-            const statusWaktu = log?.statusWaktu;
-            let poin: number;
-            let isMasalah = false;
+          let statusKehadiran = log?.statusKehadiran ?? "ALFA";
+          const statusWaktu = log?.statusWaktu;
+          let poin: number;
+          let isMasalah = false;
 
-            if (!log) {
-              // Tidak ada log → alfa dengan poinAlfa sesi
+          if (!log) {
+            // Tidak ada log → alfa dengan poinAlfa sesi
+            isMasalah = true;
+            statusKehadiran = "ALFA";
+            poin = sesi.poinAlfa;
+          } else {
+            // Gunakan poin dari log (sudah sesuai, termasuk poinAlfa jika statusnya ALFA/TIDAK_HADIR)
+            poin = log.poinDidapat;
+            if (
+              log.statusKehadiran !== "HADIR" ||
+              log.statusWaktu === "TELAT"
+            ) {
               isMasalah = true;
-              statusKehadiran = "ALFA";
-              poin = sesi.poinAlfa;
-            } else {
-              // Gunakan poin dari log (sudah sesuai, termasuk poinAlfa jika statusnya ALFA/TIDAK_HADIR)
-              poin = log.poinDidapat;
-              if (
-                log.statusKehadiran !== "HADIR" ||
-                log.statusWaktu === "TELAT"
-              ) {
-                isMasalah = true;
-              }
-            }
-
-            if (isMasalah) {
-              siswaBermasalah.push({
-                logId: log?.id ?? `missing-${peserta.id}-${sesi.id}`,
-                peserta: {
-                  id: peserta.id,
-                  namaLengkap: peserta.namaLengkap,
-                },
-                kelas: peserta.kelas,
-                statusKehadiran,
-                statusWaktu,
-                poinDidapat: poin,
-                keterangan: log?.keterangan ?? "Tidak melakukan absensi",
-              });
             }
           }
 
-          return {
-            sesiDetail: {
-              id: sesi.id,
-              namaSesi: sesi.namaSesi,
-              waktuMulai: sesi.waktuMulai,
-            },
-            kategoriDetail: sesi.kategori,
-            siswaBermasalah,
-          };
-        })
-        .filter((grup) => grup.siswaBermasalah.length > 0);
+          if (isMasalah) {
+            siswaBermasalah.push({
+              logId: log?.id ?? `missing-${peserta.id}-${sesi.id}`,
+              peserta: {
+                id: peserta.id,
+                namaLengkap: peserta.namaLengkap,
+              },
+              kelas: peserta.kelas,
+              statusKehadiran,
+              statusWaktu,
+              poinDidapat: poin,
+              keterangan: log?.keterangan ?? "Tidak melakukan absensi",
+            });
+          }
+        }
+
+        return {
+          sesiDetail: {
+            id: sesi.id,
+            namaSesi: sesi.namaSesi,
+            waktuMulai: sesi.waktuMulai,
+          },
+          kategoriDetail: sesi.kategori,
+          siswaBermasalah,
+        };
+      });
 
       return hasilAkhir;
     }),
