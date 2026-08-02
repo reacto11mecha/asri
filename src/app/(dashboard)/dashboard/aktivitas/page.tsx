@@ -26,9 +26,10 @@ import { format } from "date-fns";
 import { id } from "date-fns/locale";
 import { ManualLogFormDialog } from "~/_components/aktivitas/manual-log-form-dialog";
 import { EditLogDialog } from "~/_components/aktivitas/edit-log-dialog";
-import { RotateCcw } from "lucide-react";
+import { RotateCcw, ChevronLeft, ChevronRight } from "lucide-react";
 
-type LogEntry = RouterOutputs["aktivitas"]["getRecentLogs"][number];
+// Tipe diperbarui untuk mengakses properti 'data' dari struktur return yang baru
+type LogEntry = RouterOutputs["aktivitas"]["getRecentLogs"]["data"][number];
 
 function getStatusBadge(log: LogEntry) {
   if (log.statusKehadiran === "HADIR" && log.statusWaktu === "TELAT") {
@@ -88,6 +89,10 @@ export default function AktivitasPage() {
   const [statusKehadiran, setStatusKehadiran] = useState("");
   const [tipeLog, setTipeLog] = useState<"SESI" | "PELANGGARAN" | "">("");
 
+  // State Paginasi
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(20);
+
   const { data: options } = api.aktivitas.getFormOptions.useQuery(undefined, {
     staleTime: 5 * 60 * 1000,
   });
@@ -125,7 +130,10 @@ export default function AktivitasPage() {
   }, [sesiId, semuaSesi]);
 
   const filterPayload = useMemo(() => {
-    const payload: Record<string, unknown> = {};
+    const payload: Record<string, unknown> = {
+      page,
+      limit,
+    };
     if (startDate) payload.startDate = startDate;
     if (endDate) payload.endDate = endDate;
     if (jenjang) payload.jenjang = jenjang;
@@ -135,7 +143,7 @@ export default function AktivitasPage() {
     if (namaSiswa) payload.namaSiswa = namaSiswa;
     if (statusKehadiran) payload.statusKehadiran = statusKehadiran;
     if (tipeLog) payload.tipeLog = tipeLog;
-    return Object.keys(payload).length > 0 ? payload : undefined;
+    return payload;
   }, [
     startDate,
     endDate,
@@ -146,12 +154,17 @@ export default function AktivitasPage() {
     namaSiswa,
     statusKehadiran,
     tipeLog,
+    page,
+    limit,
   ]);
 
-  const { data: logs, isLoading } = api.aktivitas.getRecentLogs.useQuery(
-    filterPayload ?? {},
+  const { data: queryResult, isLoading } = api.aktivitas.getRecentLogs.useQuery(
+    filterPayload as any,
     { enabled: true },
   );
+
+  const logs = queryResult?.data ?? [];
+  const meta = queryResult?.meta;
 
   const resetFilter = () => {
     setStartDate("");
@@ -163,6 +176,8 @@ export default function AktivitasPage() {
     setNamaSiswa("");
     setStatusKehadiran("");
     setTipeLog("");
+    setPage(1);
+    setLimit(20);
   };
 
   return (
@@ -190,7 +205,10 @@ export default function AktivitasPage() {
               <Input
                 type="date"
                 value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
+                onChange={(e) => {
+                  setStartDate(e.target.value);
+                  setPage(1);
+                }}
               />
             </div>
             <div className="flex flex-col">
@@ -198,7 +216,10 @@ export default function AktivitasPage() {
               <Input
                 type="date"
                 value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
+                onChange={(e) => {
+                  setEndDate(e.target.value);
+                  setPage(1);
+                }}
               />
             </div>
 
@@ -210,6 +231,7 @@ export default function AktivitasPage() {
                   setJenjang(v === "SEMUA" ? "" : (v as "SD" | "SMP" | "SMA"));
                   setTingkat("");
                   setKelasId("");
+                  setPage(1);
                 }}
               >
                 <SelectTrigger>
@@ -232,6 +254,7 @@ export default function AktivitasPage() {
                 onValueChange={(v) => {
                   setTingkat(v === "SEMUA" ? "" : (v ?? ""));
                   setKelasId("");
+                  setPage(1);
                 }}
               >
                 <SelectTrigger>
@@ -253,9 +276,10 @@ export default function AktivitasPage() {
               <Select
                 value={kelasId || "SEMUA"}
                 disabled={!tingkat}
-                onValueChange={(v) =>
-                  setKelasId(v === "SEMUA" ? "" : (v ?? ""))
-                }
+                onValueChange={(v) => {
+                  setKelasId(v === "SEMUA" ? "" : (v ?? ""));
+                  setPage(1);
+                }}
               >
                 <SelectTrigger>
                   <SelectValue>
@@ -279,7 +303,10 @@ export default function AktivitasPage() {
               <label className="mb-1 text-xs font-medium">Sesi</label>
               <Select
                 value={sesiId || "SEMUA"}
-                onValueChange={(v) => setSesiId(v === "SEMUA" ? "" : (v ?? ""))}
+                onValueChange={(v) => {
+                  setSesiId(v === "SEMUA" ? "" : (v ?? ""));
+                  setPage(1);
+                }}
               >
                 <SelectTrigger>
                   <SelectValue>
@@ -302,7 +329,10 @@ export default function AktivitasPage() {
               <Input
                 placeholder="Cari nama..."
                 value={namaSiswa}
-                onChange={(e) => setNamaSiswa(e.target.value)}
+                onChange={(e) => {
+                  setNamaSiswa(e.target.value);
+                  setPage(1);
+                }}
               />
             </div>
 
@@ -310,9 +340,10 @@ export default function AktivitasPage() {
               <label className="mb-1 text-xs font-medium">Status</label>
               <Select
                 value={statusKehadiran || "SEMUA"}
-                onValueChange={(v) =>
-                  setStatusKehadiran(v === "SEMUA" ? "" : (v ?? ""))
-                }
+                onValueChange={(v) => {
+                  setStatusKehadiran(v === "SEMUA" ? "" : (v ?? ""));
+                  setPage(1);
+                }}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Semua" />
@@ -332,11 +363,12 @@ export default function AktivitasPage() {
               <label className="mb-1 text-xs font-medium">Tipe Log</label>
               <Select
                 value={tipeLog || "SEMUA"}
-                onValueChange={(v) =>
+                onValueChange={(v) => {
                   setTipeLog(
                     v === "SEMUA" ? "" : ((v as "SESI" | "PELANGGARAN") ?? ""),
-                  )
-                }
+                  );
+                  setPage(1);
+                }}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Semua" />
@@ -358,7 +390,7 @@ export default function AktivitasPage() {
         </CardContent>
       </Card>
 
-      {/* Tabel log */}
+      {/* Tabel log & Paginasi */}
       <Card>
         <CardHeader>
           <CardTitle>Data Log</CardTitle>
@@ -367,119 +399,191 @@ export default function AktivitasPage() {
           {isLoading ? (
             <p className="text-muted-foreground text-sm">Memuat data...</p>
           ) : (
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Waktu & Tanggal</TableHead>
-                    <TableHead>Siswa</TableHead>
-                    <TableHead>Aktivitas / Pelanggaran</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Poin</TableHead>
-                    <TableHead>Keterangan</TableHead>
-                    <TableHead>Pencatat</TableHead>
-                    <TableHead className="w-16"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {logs?.map((log) => (
-                    <TableRow key={log.id}>
-                      <TableCell className="whitespace-nowrap">
-                        <div className="font-medium">
-                          {format(new Date(log.waktuScan), "HH:mm:ss")}
-                        </div>
-                        <div className="text-muted-foreground text-xs">
-                          {format(new Date(log.tanggal), "dd MMM yyyy", {
-                            locale: id,
-                          })}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="font-medium">
-                          {log.pesertaDidik.namaLengkap}
-                        </div>
-                        <div className="text-muted-foreground text-xs">
-                          {log.pesertaDidik.kelas.jenjang}{" "}
-                          {log.pesertaDidik.kelas.tingkat}{" "}
-                          {log.pesertaDidik.kelas.namaKelas}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {log.sesi ? (
-                          <div>
-                            <span className="font-medium">
-                              {log.sesi.kategori?.namaKategori}
-                            </span>
-                            <span className="text-muted-foreground mx-1">
-                              •
-                            </span>
-                            <span>{log.sesi.namaSesi}</span>
-                          </div>
-                        ) : log.pelanggaran ? (
-                          <div className="flex items-center gap-2 font-medium text-red-600">
-                            {log.pelanggaran.namaPelanggaran}
-                            <Badge
-                              variant="destructive"
-                              className="h-4 px-1 py-0 text-[10px]"
-                            >
-                              {log.pelanggaran.tingkat}
-                            </Badge>
-                          </div>
-                        ) : (
-                          "-"
-                        )}
-                      </TableCell>
-                      <TableCell>{getStatusBadge(log)}</TableCell>
-                      <TableCell className="text-right font-mono">
-                        <div
-                          className={`font-bold ${
-                            log.poinDidapat > 0
-                              ? "text-green-600"
-                              : log.poinDidapat < 0
-                                ? "text-red-600"
-                                : "text-gray-500"
-                          }`}
-                        >
-                          {log.poinDidapat > 0
-                            ? `+${log.poinDidapat}`
-                            : log.poinDidapat}
-                        </div>
-                        {log.isPoinManual && (
-                          <div className="text-[10px] text-orange-500 italic">
-                            Diedit Manual
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell
-                        className="max-w-[150px] truncate"
-                        title={log.keterangan || "-"}
-                      >
-                        {log.keterangan || (
-                          <span className="text-muted-foreground italic">
-                            -
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        {log.waliAsuh?.name || "Sistem"}
-                      </TableCell>
-                      <TableCell>
-                        <EditLogDialog log={log} />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {logs?.length === 0 && (
+            <div className="flex flex-col space-y-4">
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
                     <TableRow>
-                      <TableCell
-                        colSpan={8}
-                        className="text-muted-foreground py-8 text-center"
-                      >
-                        Tidak ada data yang sesuai filter.
-                      </TableCell>
+                      <TableHead>Waktu & Tanggal</TableHead>
+                      <TableHead>Siswa</TableHead>
+                      <TableHead>Aktivitas / Pelanggaran</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Poin</TableHead>
+                      <TableHead>Keterangan</TableHead>
+                      <TableHead>Pencatat</TableHead>
+                      <TableHead className="w-16"></TableHead>
                     </TableRow>
-                  )}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {logs.map((log) => (
+                      <TableRow key={log.id}>
+                        <TableCell className="whitespace-nowrap">
+                          <div className="font-medium">
+                            {format(new Date(log.waktuScan), "HH:mm:ss")}
+                          </div>
+                          <div className="text-muted-foreground text-xs">
+                            {format(new Date(log.tanggal), "dd MMM yyyy", {
+                              locale: id,
+                            })}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium">
+                            {log.pesertaDidik.namaLengkap}
+                          </div>
+                          <div className="text-muted-foreground text-xs">
+                            {log.pesertaDidik.kelas.jenjang}{" "}
+                            {log.pesertaDidik.kelas.tingkat}{" "}
+                            {log.pesertaDidik.kelas.namaKelas}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {log.sesi ? (
+                            <div>
+                              <span className="font-medium">
+                                {log.sesi.kategori?.namaKategori}
+                              </span>
+                              <span className="text-muted-foreground mx-1">
+                                •
+                              </span>
+                              <span>{log.sesi.namaSesi}</span>
+                            </div>
+                          ) : log.pelanggaran ? (
+                            <div className="flex items-center gap-2 font-medium text-red-600">
+                              {log.pelanggaran.namaPelanggaran}
+                              <Badge
+                                variant="destructive"
+                                className="h-4 px-1 py-0 text-[10px]"
+                              >
+                                {log.pelanggaran.tingkat}
+                              </Badge>
+                            </div>
+                          ) : (
+                            "-"
+                          )}
+                        </TableCell>
+                        <TableCell>{getStatusBadge(log)}</TableCell>
+                        <TableCell className="text-right font-mono">
+                          <div
+                            className={`font-bold ${
+                              log.poinDidapat > 0
+                                ? "text-green-600"
+                                : log.poinDidapat < 0
+                                  ? "text-red-600"
+                                  : "text-gray-500"
+                            }`}
+                          >
+                            {log.poinDidapat > 0
+                              ? `+${log.poinDidapat}`
+                              : log.poinDidapat}
+                          </div>
+                          {log.isPoinManual && (
+                            <div className="text-[10px] text-orange-500 italic">
+                              Diedit Manual
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell
+                          className="max-w-[150px] truncate"
+                          title={log.keterangan || "-"}
+                        >
+                          {log.keterangan || (
+                            <span className="text-muted-foreground italic">
+                              -
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {log.waliAsuh?.name || "Sistem"}
+                        </TableCell>
+                        <TableCell>
+                          <EditLogDialog log={log} />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {logs.length === 0 && (
+                      <TableRow>
+                        <TableCell
+                          colSpan={8}
+                          className="text-muted-foreground py-8 text-center"
+                        >
+                          Tidak ada data yang sesuai filter.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Komponen Navigasi Paginasi */}
+              {meta && meta.totalRecords > 0 && (
+                <div className="flex flex-col items-center justify-between gap-4 px-2 sm:flex-row">
+                  <div className="text-muted-foreground text-sm">
+                    Menampilkan{" "}
+                    <span className="font-medium">
+                      {(meta.currentPage - 1) * limit + 1}
+                    </span>{" "}
+                    -{" "}
+                    <span className="font-medium">
+                      {Math.min(meta.currentPage * limit, meta.totalRecords)}
+                    </span>{" "}
+                    dari{" "}
+                    <span className="font-medium">{meta.totalRecords}</span>{" "}
+                    aktivitas
+                  </div>
+
+                  <div className="flex items-center space-x-4">
+                    <div className="flex items-center space-x-2">
+                      <span className="text-sm font-medium">
+                        Baris per halaman
+                      </span>
+                      <Select
+                        value={limit.toString()}
+                        onValueChange={(v) => {
+                          setLimit(Number(v));
+                          setPage(1);
+                        }}
+                      >
+                        <SelectTrigger className="h-8 w-[70px]">
+                          <SelectValue placeholder={limit.toString()} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="10">10</SelectItem>
+                          <SelectItem value="20">20</SelectItem>
+                          <SelectItem value="50">50</SelectItem>
+                          <SelectItem value="100">100</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => setPage((p) => Math.max(1, p - 1))}
+                        disabled={page === 1}
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      <div className="text-sm font-medium">
+                        Hal {meta.currentPage} / {meta.totalPages}
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() =>
+                          setPage((p) => Math.min(meta.totalPages, p + 1))
+                        }
+                        disabled={page === meta.totalPages}
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </CardContent>

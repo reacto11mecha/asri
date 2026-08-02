@@ -30,7 +30,7 @@ import { z } from "zod";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 
-type LogEntry = RouterOutputs["aktivitas"]["getRecentLogs"][number];
+type LogEntry = RouterOutputs["aktivitas"]["getRecentLogs"]["data"][number];
 
 const formSchema = z.object({
   statusKehadiran: z

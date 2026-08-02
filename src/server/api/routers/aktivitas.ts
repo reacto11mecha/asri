@@ -1,7 +1,17 @@
 // src/server/api/routers/aktivitas.ts
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { desc, eq, asc, and, gte, lte, like, isNotNull } from "drizzle-orm";
+import {
+  desc,
+  eq,
+  asc,
+  and,
+  gte,
+  lte,
+  like,
+  isNotNull,
+  sql,
+} from "drizzle-orm";
 import {
   logAbsensi,
   pesertaDidik,
@@ -43,11 +53,17 @@ export const aktivitasRouter = createTRPCRouter({
           namaSiswa: z.string().optional(),
           statusKehadiran: statusKehadiranEnum.optional(),
           tipeLog: tipeLogEnum.optional(),
-          limit: z.number().min(1).max(200).default(100),
+          limit: z.number().min(1).max(200).default(20), // Default diubah menjadi 20 per halaman
+          page: z.number().min(1).default(1), // Tambahan parameter halaman
         })
         .optional(),
     )
     .query(async ({ ctx, input }) => {
+      // Setup Kalkulasi Paginasi
+      const limit = input?.limit ?? 20;
+      const page = input?.page ?? 1;
+      const offset = (page - 1) * limit;
+
       const conditions = [];
 
       if (input?.startDate) {
@@ -68,10 +84,32 @@ export const aktivitasRouter = createTRPCRouter({
         conditions.push(isNotNull(logAbsensi.pelanggaranId));
       }
 
-      // Query dengan kolom flat
+      // Kumpulkan semua klausa WHERE menjadi satu variabel (DRY)
+      const whereClause = and(
+        ...conditions,
+        input?.jenjang ? eq(kelas.jenjang, input.jenjang) : undefined,
+        input?.tingkat ? eq(kelas.tingkat, input.tingkat) : undefined,
+        input?.kelasId ? eq(kelas.id, input.kelasId) : undefined,
+        input?.namaSiswa
+          ? like(pesertaDidik.namaLengkap, `%${input.namaSiswa}%`)
+          : undefined,
+      );
+
+      // 1. Query Menghitung Total Keseluruhan Data
+      const [totalCountResult] = await ctx.db
+        .select({ total: sql<number>`count(${logAbsensi.id})`.mapWith(Number) })
+        .from(logAbsensi)
+        .innerJoin(pesertaDidik, eq(logAbsensi.pesertaDidikId, pesertaDidik.id))
+        .innerJoin(kelas, eq(pesertaDidik.kelasId, kelas.id))
+        // Tidak perlu me-join tabel sesi dan pelanggaran untuk menghitung total,
+        // karena filternya mengacu pada logAbsensi secara langsung
+        .where(whereClause);
+
+      const totalRecords = totalCountResult?.total ?? 0;
+
+      // 2. Query Utama (Mengambil Potongan Data sesuai Paginasi)
       const rows = await ctx.db
         .select({
-          // Log Absensi
           id: logAbsensi.id,
           tanggal: logAbsensi.tanggal,
           waktuScan: logAbsensi.waktuScan,
@@ -81,30 +119,24 @@ export const aktivitasRouter = createTRPCRouter({
           isPoinManual: logAbsensi.isPoinManual,
           keterangan: logAbsensi.keterangan,
 
-          // Peserta Didik
           pesertaId: pesertaDidik.id,
           pesertaNama: pesertaDidik.namaLengkap,
 
-          // Kelas
           kelasId: kelas.id,
           kelasJenjang: kelas.jenjang,
           kelasTingkat: kelas.tingkat,
           kelasNama: kelas.namaKelas,
 
-          // Sesi Absensi (nullable)
           sesiId: sesiAbsensi.id,
           sesiNama: sesiAbsensi.namaSesi,
 
-          // Kategori Absensi (nullable)
           kategoriId: kategoriAbsensi.id,
           kategoriNama: kategoriAbsensi.namaKategori,
 
-          // Master Pelanggaran (nullable)
           pelanggaranId: masterPelanggaran.id,
           pelanggaranNama: masterPelanggaran.namaPelanggaran,
           pelanggaranTingkat: masterPelanggaran.tingkat,
 
-          // User (wali asuh)
           waliAsuhId: user.id,
           waliAsuhName: user.name,
         })
@@ -121,19 +153,10 @@ export const aktivitasRouter = createTRPCRouter({
           eq(logAbsensi.pelanggaranId, masterPelanggaran.id),
         )
         .leftJoin(user, eq(logAbsensi.waliAsuhId, user.id))
-        .where(
-          and(
-            ...conditions,
-            input?.jenjang ? eq(kelas.jenjang, input.jenjang) : undefined,
-            input?.tingkat ? eq(kelas.tingkat, input.tingkat) : undefined,
-            input?.kelasId ? eq(kelas.id, input.kelasId) : undefined,
-            input?.namaSiswa
-              ? like(pesertaDidik.namaLengkap, `%${input.namaSiswa}%`)
-              : undefined,
-          ),
-        )
+        .where(whereClause)
         .orderBy(desc(logAbsensi.waktuScan))
-        .limit(input?.limit ?? 100);
+        .limit(limit)
+        .offset(offset);
 
       // Mapping ke bentuk nested yang diharapkan frontend
       const results = rows.map((row) => ({
@@ -178,7 +201,15 @@ export const aktivitasRouter = createTRPCRouter({
           : null,
       }));
 
-      return results;
+      // 3. Return Object yang Memuat Data dan Meta-Paginasi
+      return {
+        data: results,
+        meta: {
+          totalRecords,
+          totalPages: Math.ceil(totalRecords / limit),
+          currentPage: page,
+        },
+      };
     }),
 
   // --------------------------------------------------------
