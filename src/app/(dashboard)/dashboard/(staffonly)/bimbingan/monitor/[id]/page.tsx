@@ -57,7 +57,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
-import { generateMonevPDF } from "~/lib/generate-monev-pdf";
+import { generateMonevPDF } from "~/lib/generate-pdf";
 
 export default function DetailMonitoringPage() {
   const params = useParams();

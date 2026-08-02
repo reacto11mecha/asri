@@ -335,80 +335,104 @@ export default function DashboardInsightPage() {
                 Memuat data...
               </p>
             ) : sesiBermasalah?.length === 0 ? (
+              // Jika benar-benar tidak ada sesi wajib sama sekali pada tanggal/filter ini
               <div className="flex flex-col items-center justify-center py-12 text-center">
-                <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100">
-                  <Medal className="h-8 w-8 text-emerald-600" />
-                </div>
-                <h3 className="text-lg font-bold text-emerald-700">
-                  Luar Biasa!
-                </h3>
                 <p className="text-muted-foreground">
-                  Tidak ada satupun anak yang telat atau alfa di sesi wajib hari
-                  ini.
+                  Tidak ada jadwal sesi wajib pada filter ini.
                 </p>
               </div>
             ) : (
               <Accordion multiple className="w-full">
-                {sesiBermasalah?.map((grupSesi: SesiBermasalahItem) => (
-                  <AccordionItem
-                    key={grupSesi.sesiDetail.id}
-                    value={grupSesi.sesiDetail.id}
-                    className="bg-muted/20 mb-3 rounded-lg border px-1"
-                  >
-                    <AccordionTrigger className="px-3 hover:no-underline">
-                      <div className="flex w-full items-center justify-between pr-4">
-                        <div className="flex flex-col items-start">
-                          <span className="text-base font-bold">
-                            {grupSesi.sesiDetail.namaSesi}
-                          </span>
-                          <span className="text-muted-foreground text-xs">
-                            {grupSesi.kategoriDetail.namaKategori} •{" "}
-                            {grupSesi.sesiDetail.waktuMulai?.substring(0, 5) ||
-                              "Fleksibel"}
-                          </span>
-                        </div>
-                        <Badge
-                          variant="destructive"
-                          className="ml-2 rounded-full px-2.5"
-                        >
-                          {grupSesi.siswaBermasalah.length} Anak
-                        </Badge>
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent className="px-3 pb-4">
-                      <div className="mt-2 space-y-2">
-                        {grupSesi.siswaBermasalah.map((siswa) => (
-                          <div
-                            key={siswa.logId}
-                            className="bg-background flex items-center justify-between rounded-md border p-3 shadow-sm"
-                          >
-                            <div>
-                              <p className="font-semibold">
-                                {siswa.peserta.namaLengkap}
-                              </p>
-                              <p className="text-muted-foreground text-xs">
-                                {siswa.kelas.tingkat} {siswa.kelas.namaKelas}
-                              </p>
-                            </div>
-                            <div className="flex flex-col items-end gap-1">
-                              {siswa.logId.startsWith("missing-")
-                                ? getStatusBadge("ALFA", true)
-                                : getStatusBadge(siswa.statusKehadiran)}
-                              <span
-                                className={`font-mono text-xs font-bold ${siswa.poinDidapat < 0 ? "text-red-500" : "text-gray-700"}`}
-                              >
-                                {siswa.poinDidapat > 0
-                                  ? `+${siswa.poinDidapat}`
-                                  : siswa.poinDidapat}{" "}
-                                Poin
-                              </span>
-                            </div>
+                {sesiBermasalah?.map((grupSesi: SesiBermasalahItem) => {
+                  // Cek apakah sesi ini aman (semua anak hadir tepat waktu)
+                  const isAman = grupSesi.siswaBermasalah.length === 0;
+
+                  return (
+                    <AccordionItem
+                      key={grupSesi.sesiDetail.id}
+                      value={grupSesi.sesiDetail.id}
+                      className="bg-muted/20 mb-3 rounded-lg border px-1"
+                    >
+                      <AccordionTrigger className="px-3 hover:no-underline">
+                        <div className="flex w-full items-center justify-between pr-4">
+                          <div className="flex flex-col items-start">
+                            <span className="text-base font-bold">
+                              {grupSesi.sesiDetail.namaSesi}
+                            </span>
+                            <span className="text-muted-foreground text-xs">
+                              {grupSesi.kategoriDetail.namaKategori} •{" "}
+                              {grupSesi.sesiDetail.waktuMulai?.substring(
+                                0,
+                                5,
+                              ) || "Fleksibel"}
+                            </span>
                           </div>
-                        ))}
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                ))}
+
+                          {/* Logika Tampilan Badge */}
+                          {isAman ? (
+                            <Badge className="ml-2 rounded-full border-none bg-emerald-500 px-2.5 text-white hover:bg-emerald-600">
+                              Aman Lengkap
+                            </Badge>
+                          ) : (
+                            <Badge
+                              variant="destructive"
+                              className="ml-2 rounded-full px-2.5"
+                            >
+                              {grupSesi.siswaBermasalah.length} Anak
+                            </Badge>
+                          )}
+                        </div>
+                      </AccordionTrigger>
+
+                      <AccordionContent className="px-3 pb-4">
+                        {/* Logika Tampilan Isi Sesi */}
+                        {isAman ? (
+                          <div className="flex flex-col items-center justify-center py-4 text-center">
+                            <Medal className="mb-2 h-8 w-8 text-emerald-500" />
+                            <p className="font-bold text-emerald-700">
+                              Luar Biasa!
+                            </p>
+                            <p className="text-sm text-emerald-600/80">
+                              Semua anak sudah melakukan absensi tepat waktu.
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="mt-2 space-y-2">
+                            {grupSesi.siswaBermasalah.map((siswa) => (
+                              <div
+                                key={siswa.logId}
+                                className="bg-background flex items-center justify-between rounded-md border p-3 shadow-sm"
+                              >
+                                <div>
+                                  <p className="font-semibold">
+                                    {siswa.peserta.namaLengkap}
+                                  </p>
+                                  <p className="text-muted-foreground text-xs">
+                                    {siswa.kelas.tingkat}{" "}
+                                    {siswa.kelas.namaKelas}
+                                  </p>
+                                </div>
+                                <div className="flex flex-col items-end gap-1">
+                                  {siswa.logId.startsWith("missing-")
+                                    ? getStatusBadge("ALFA", true)
+                                    : getStatusBadge(siswa.statusKehadiran)}
+                                  <span
+                                    className={`font-mono text-xs font-bold ${siswa.poinDidapat < 0 ? "text-red-500" : "text-gray-700"}`}
+                                  >
+                                    {siswa.poinDidapat > 0
+                                      ? `+${siswa.poinDidapat}`
+                                      : siswa.poinDidapat}{" "}
+                                    Poin
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </AccordionContent>
+                    </AccordionItem>
+                  );
+                })}
               </Accordion>
             )}
           </CardContent>

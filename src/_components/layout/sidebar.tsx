@@ -65,6 +65,7 @@ export function Sidebar({
             { name: "Data Peserta", href: "/dashboard/peserta", icon: Users },
           ]
         : [
+            { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
             {
               name: "Aktivitas Absensi",
               href: "/dashboard/aktivitas",

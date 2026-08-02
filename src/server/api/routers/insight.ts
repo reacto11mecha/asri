@@ -1,6 +1,6 @@
 // src/server/api/routers/insight.ts
 import { z } from "zod";
-import { createTRPCRouter, staffProcedure } from "~/server/api/trpc";
+import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { and, eq, inArray, isNotNull, desc, sql } from "drizzle-orm";
 import {
   logAbsensi,
@@ -23,7 +23,7 @@ export const insightRouter = createTRPCRouter({
   // --------------------------------------------------------
   // A. HELPER UI: GET KELAS OPTIONS
   // --------------------------------------------------------
-  getFilterOptions: staffProcedure
+  getFilterOptions: protectedProcedure
     .input(z.object({ jenjang: z.enum(["SD", "SMP", "SMA"]) }))
     .query(async ({ ctx, input }) => {
       const kelasData = await ctx.db.query.kelas.findMany({
@@ -40,7 +40,7 @@ export const insightRouter = createTRPCRouter({
   // --------------------------------------------------------
   // B. RADAR STATISTIK (Hadir, Telat, Alfa, Sakit/Izin, Lainnya)
   // --------------------------------------------------------
-  getStatistikHarian: staffProcedure
+  getStatistikHarian: protectedProcedure
     .input(insightFilterSchema)
     .query(async ({ ctx, input }) => {
       // 1. Ambil peserta aktif sesuai filter
@@ -148,7 +148,7 @@ export const insightRouter = createTRPCRouter({
   // --------------------------------------------------------
   // C. SOROTAN KEDISIPLINAN: SESI BERMASALAH (Accordion)
   // --------------------------------------------------------
-  getEvaluasiSesi: staffProcedure
+  getEvaluasiSesi: protectedProcedure
     .input(insightFilterSchema)
     .query(async ({ ctx, input }) => {
       // Ambil semua peserta didik aktif sesuai filter
@@ -235,63 +235,61 @@ export const insightRouter = createTRPCRouter({
         );
 
       // Struktur hasil: per sesi, siswa bermasalah
-      const hasilAkhir = grouped
-        .map(({ sesi, pesertaSesi }) => {
-          const siswaBermasalah: any[] = [];
+      const hasilAkhir = grouped.map(({ sesi, pesertaSesi }) => {
+        const siswaBermasalah: any[] = [];
 
-          for (const peserta of pesertaSesi) {
-            const log = allLogs.find(
-              (l) => l.sesiId === sesi.id && l.pesertaDidikId === peserta.id,
-            );
+        for (const peserta of pesertaSesi) {
+          const log = allLogs.find(
+            (l) => l.sesiId === sesi.id && l.pesertaDidikId === peserta.id,
+          );
 
-            let statusKehadiran = log?.statusKehadiran ?? "ALFA";
-            const statusWaktu = log?.statusWaktu;
-            let poin: number;
-            let isMasalah = false;
+          let statusKehadiran = log?.statusKehadiran ?? "ALFA";
+          const statusWaktu = log?.statusWaktu;
+          let poin: number;
+          let isMasalah = false;
 
-            if (!log) {
-              // Tidak ada log → alfa dengan poinAlfa sesi
+          if (!log) {
+            // Tidak ada log → alfa dengan poinAlfa sesi
+            isMasalah = true;
+            statusKehadiran = "ALFA";
+            poin = sesi.poinAlfa;
+          } else {
+            // Gunakan poin dari log (sudah sesuai, termasuk poinAlfa jika statusnya ALFA/TIDAK_HADIR)
+            poin = log.poinDidapat;
+            if (
+              log.statusKehadiran !== "HADIR" ||
+              log.statusWaktu === "TELAT"
+            ) {
               isMasalah = true;
-              statusKehadiran = "ALFA";
-              poin = sesi.poinAlfa;
-            } else {
-              // Gunakan poin dari log (sudah sesuai, termasuk poinAlfa jika statusnya ALFA/TIDAK_HADIR)
-              poin = log.poinDidapat;
-              if (
-                log.statusKehadiran !== "HADIR" ||
-                log.statusWaktu === "TELAT"
-              ) {
-                isMasalah = true;
-              }
-            }
-
-            if (isMasalah) {
-              siswaBermasalah.push({
-                logId: log?.id ?? `missing-${peserta.id}-${sesi.id}`,
-                peserta: {
-                  id: peserta.id,
-                  namaLengkap: peserta.namaLengkap,
-                },
-                kelas: peserta.kelas,
-                statusKehadiran,
-                statusWaktu,
-                poinDidapat: poin,
-                keterangan: log?.keterangan ?? "Tidak melakukan absensi",
-              });
             }
           }
 
-          return {
-            sesiDetail: {
-              id: sesi.id,
-              namaSesi: sesi.namaSesi,
-              waktuMulai: sesi.waktuMulai,
-            },
-            kategoriDetail: sesi.kategori,
-            siswaBermasalah,
-          };
-        })
-        .filter((grup) => grup.siswaBermasalah.length > 0);
+          if (isMasalah) {
+            siswaBermasalah.push({
+              logId: log?.id ?? `missing-${peserta.id}-${sesi.id}`,
+              peserta: {
+                id: peserta.id,
+                namaLengkap: peserta.namaLengkap,
+              },
+              kelas: peserta.kelas,
+              statusKehadiran,
+              statusWaktu,
+              poinDidapat: poin,
+              keterangan: log?.keterangan ?? "Tidak melakukan absensi",
+            });
+          }
+        }
+
+        return {
+          sesiDetail: {
+            id: sesi.id,
+            namaSesi: sesi.namaSesi,
+            waktuMulai: sesi.waktuMulai,
+          },
+          kategoriDetail: sesi.kategori,
+          siswaBermasalah,
+        };
+      });
 
       return hasilAkhir;
     }),
@@ -299,7 +297,7 @@ export const insightRouter = createTRPCRouter({
   // --------------------------------------------------------
   // D. SOROTAN KEDISIPLINAN: PELANGGARAN MANUAL
   // --------------------------------------------------------
-  getDaftarPelanggaran: staffProcedure
+  getDaftarPelanggaran: protectedProcedure
     .input(insightFilterSchema)
     .query(async ({ ctx, input }) => {
       const pelanggaranHariIni = await ctx.db
@@ -344,7 +342,7 @@ export const insightRouter = createTRPCRouter({
   // // --------------------------------------------------------
   // // E. WALL OF FAME (Top Poin Positif)
   // // --------------------------------------------------------
-  // getWallOfFame: staffProcedure
+  // getWallOfFame: protectedProcedure
   //   .input(
   //     insightFilterSchema.extend({
   //       limit: z.number().default(5),

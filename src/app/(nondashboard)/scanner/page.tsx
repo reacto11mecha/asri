@@ -21,6 +21,7 @@ import { Card, CardContent } from "~/components/ui/card";
 import { toast } from "sonner";
 import { useBeep } from "~/hooks/use-beep";
 import QrScanner from "qr-scanner";
+import type { RouterOutputs } from "~/trpc/react";
 
 const ScannerClient = dynamic(
   () => import("~/_components/scanner/scanner-client"),
@@ -54,7 +55,9 @@ export default function ScannerPage() {
   const [scanStatus, setScanStatus] = useState<"idle" | "success" | "error">(
     "idle",
   );
-  const [scanData, setScanData] = useState<any>(null);
+  const [scanData, setScanData] = useState<
+    RouterOutputs["aktivitas"]["scanQr"] | null
+  >(null);
   const [errorMessage, setErrorMessage] = useState("");
 
   const [searchSesi, setSearchSesi] = useState("");
