@@ -11,6 +11,7 @@ import {
   kelas,
   user,
 } from "~/server/db/schema";
+import { format, subDays, getHours } from "date-fns";
 import type { ScanResult } from "~/types/scan";
 
 // Enum untuk opsi filter
@@ -330,7 +331,8 @@ export const aktivitasRouter = createTRPCRouter({
     .input(
       z.object({
         nipd: z.string(),
-        sesiId: z.string(), // KategoriId dihapus karena kita hanya butuh ID Sesi-nya saja
+        sesiId: z.string(),
+        timeZone: z.string().default("Asia/Jakarta"),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -363,7 +365,7 @@ export const aktivitasRouter = createTRPCRouter({
 
       // TAMBAHAN BARU: Validasi Agama Peserta
       // Memastikan anak Non-Is tidak bisa absen di kegiatan Islam, dan sebaliknya
-      const isTargetedAgama = sesi.targetAgama.includes(peserta.agama as any);
+      const isTargetedAgama = sesi.targetAgama.includes(peserta.agama);
       if (!isTargetedAgama) {
         throw new Error(
           `Sesi ini tidak diperuntukkan bagi peserta didik beragama ${peserta.agama}.`,
@@ -371,11 +373,13 @@ export const aktivitasRouter = createTRPCRouter({
       }
 
       // 4. Kalkulasi Waktu (Tepat Waktu vs Telat)
-      const now = new Date();
-      const currentHours = now.getHours().toString().padStart(2, "0");
-      const currentMinutes = now.getMinutes().toString().padStart(2, "0");
-      const currentSeconds = now.getSeconds().toString().padStart(2, "0");
-      const currentTimeString = `${currentHours}:${currentMinutes}:${currentSeconds}`;
+      const nowUtc = new Date();
+
+      const localTime = new Date(
+        nowUtc.toLocaleString("en-US", { timeZone: input.timeZone }),
+      );
+
+      const currentTimeString = format(localTime, "HH:mm:ss");
 
       let statusWaktu: "TEPAT_WAKTU" | "TELAT" = "TEPAT_WAKTU";
       let poin = sesi.poinTepatWaktu;
@@ -386,13 +390,12 @@ export const aktivitasRouter = createTRPCRouter({
       }
 
       // 5. Penanganan Tanggal Crossover (Tengah Malam)
-      const businessDate = new Date(now);
-      if (now.getHours() < 3) {
-        businessDate.setDate(businessDate.getDate() - 1);
+      let businessDate = localTime;
+      if (getHours(localTime) < 3) {
+        businessDate = subDays(localTime, 1);
       }
 
-      // Memastikan tipe data kembalian string yang valid
-      const tanggalFormat = businessDate.toISOString().split("T")[0] as string;
+      const tanggalFormat = format(businessDate, "yyyy-MM-dd");
 
       try {
         // 6. Simpan Log Transaksi
@@ -402,7 +405,7 @@ export const aktivitasRouter = createTRPCRouter({
           pelanggaranId: null, // Scanner bukan untuk pelanggaran
           waliAsuhId: ctx.session.user.id,
           tanggal: tanggalFormat,
-          waktuScan: now,
+          waktuScan: nowUtc,
           statusKehadiran: "HADIR",
           statusWaktu: statusWaktu,
           poinDidapat: poin,
@@ -427,6 +430,7 @@ export const aktivitasRouter = createTRPCRouter({
       z.object({
         uidKartu: z.string().length(8),
         sesiId: z.string(),
+        timeZone: z.string().default("Asia/Jakarta"),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -454,9 +458,15 @@ export const aktivitasRouter = createTRPCRouter({
           `Sesi ini tidak diperuntukkan bagi peserta beragama ${peserta.agama}.`,
         );
 
-      // 4. Kalkulasi waktu dan poin
-      const now = new Date();
-      const currentTimeString = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}:${now.getSeconds().toString().padStart(2, "0")}`;
+      // 4. Kalkulasi Waktu Lokal berdasarkan timeZone perangkat
+      const nowUtc = new Date();
+      const localTime = new Date(
+        nowUtc.toLocaleString("en-US", { timeZone: input.timeZone }),
+      );
+
+      // Gunakan date-fns untuk format jam
+      const currentTimeString = format(localTime, "HH:mm:ss");
+
       let statusWaktu: "TEPAT_WAKTU" | "TELAT" = "TEPAT_WAKTU";
       let poin = sesi.poinTepatWaktu;
 
@@ -465,10 +475,14 @@ export const aktivitasRouter = createTRPCRouter({
         poin = sesi.poinTelat;
       }
 
-      // 5. Tanggal bisnis
-      const businessDate = new Date(now);
-      if (now.getHours() < 3) businessDate.setDate(businessDate.getDate() - 1);
-      const tanggalFormat = businessDate.toISOString().split("T")[0]!;
+      // 5. Tanggal Bisnis (Midnight Crossover)
+      let businessDate = localTime;
+      if (getHours(localTime) < 3) {
+        businessDate = subDays(localTime, 1);
+      }
+
+      // Gunakan date-fns untuk format tanggal ke YYYY-MM-DD
+      const tanggalFormat = format(businessDate, "yyyy-MM-dd");
 
       // 6. Cek duplikasi
       const existing = await ctx.db.query.logAbsensi.findFirst({
@@ -490,7 +504,7 @@ export const aktivitasRouter = createTRPCRouter({
         pelanggaranId: null,
         waliAsuhId: ctx.session.user.id,
         tanggal: tanggalFormat,
-        waktuScan: now,
+        waktuScan: nowUtc, // Tetap simpan UTC di database
         statusKehadiran: "HADIR",
         statusWaktu,
         poinDidapat: poin,
