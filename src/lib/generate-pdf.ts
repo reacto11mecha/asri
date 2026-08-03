@@ -288,24 +288,23 @@ export async function generateLaporanSesiPdf(data: PdfDataPayload) {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
 
-  // -- Blok Tanda Tangan Kiri (Koordinator Asrama) --
+  // -- Blok Tanda Tangan Kiri (Kepala Sekolah) --
   const signLeftX = 20;
-  doc.text("Mengetahui,", signLeftX, finalY + 5);
-  doc.text("Koordinator Asrama", signLeftX, finalY + 10);
+  doc.text("Mengetahui,", signLeftX, finalY);
+  doc.text("Kepala Sekolah", signLeftX, finalY + 5);
   doc.setFont("helvetica", "bold");
-  doc.text("Idwar Hamzah", signLeftX, finalY + 30);
+  doc.text("Nilam Andini", signLeftX, finalY + 25);
   doc.setFont("helvetica", "normal");
-  doc.text("NIP. 198106062025211063", signLeftX, finalY + 35);
+  doc.text("NIP. 198005232006042039", signLeftX, finalY + 30);
 
-  // -- Blok Tanda Tangan Kanan (Kepala Sekolah) --
+  // -- Blok Tanda Tangan Kanan (Koordinator Asrama) --
   const signX = pageWidth - 75;
   doc.text(`Bekasi, ${currentDate}`, signX, finalY);
-  doc.text("Mengetahui,", signX, finalY + 5);
-  doc.text("Kepala Sekolah", signX, finalY + 10);
+  doc.text("Koordinator Asrama", signX, finalY + 5);
   doc.setFont("helvetica", "bold");
-  doc.text("Nilam Andini", signX, finalY + 30);
+  doc.text("Idwar Hamzah", signX, finalY + 25);
   doc.setFont("helvetica", "normal");
-  doc.text("NIP. 198005232006042039", signX, finalY + 35);
+  doc.text("NIP. 198106062025211063", signX, finalY + 30);
 
   const safeLabel = data.targetLabel.replace(/[^a-zA-Z0-9]/g, "_");
   doc.save(`Laporan_Presensi_${safeLabel}_${data.tanggal}.pdf`);

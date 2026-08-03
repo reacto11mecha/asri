@@ -22,6 +22,7 @@ import {
   user,
 } from "~/server/db/schema";
 import { format, subDays, getHours } from "date-fns";
+import { TRPCError } from "@trpc/server";
 import type { ScanResult } from "~/types/scan";
 
 // Enum untuk opsi filter
@@ -265,12 +266,20 @@ export const aktivitasRouter = createTRPCRouter({
       let statusWaktu: "TEPAT_WAKTU" | "TELAT" | null = null;
 
       if (input.tipeLog === "SESI") {
-        if (!input.sesiId) throw new Error("Sesi jadwal wajib dipilih!");
+        if (!input.sesiId)
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Sesi jadwal wajib dipilih!",
+          });
 
         const sesi = await ctx.db.query.sesiAbsensi.findFirst({
           where: eq(sesiAbsensi.id, input.sesiId),
         });
-        if (!sesi) throw new Error("Sesi tidak ditemukan di database.");
+        if (!sesi)
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Sesi tidak ditemukan di database.",
+          });
 
         if (input.statusKehadiran === "HADIR") {
           poinDidapat = sesi.poinTepatWaktu;
@@ -280,13 +289,19 @@ export const aktivitasRouter = createTRPCRouter({
         }
       } else if (input.tipeLog === "PELANGGARAN") {
         if (!input.pelanggaranId)
-          throw new Error("Jenis pelanggaran wajib dipilih!");
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Jenis pelanggaran wajib dipilih!",
+          });
 
         const pelanggaran = await ctx.db.query.masterPelanggaran.findFirst({
           where: eq(masterPelanggaran.id, input.pelanggaranId),
         });
         if (!pelanggaran)
-          throw new Error("Master pelanggaran tidak ditemukan.");
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Master pelanggaran tidak ditemukan.",
+          });
 
         poinDidapat = pelanggaran.poinMinus;
       }
@@ -332,7 +347,11 @@ export const aktivitasRouter = createTRPCRouter({
       const log = await ctx.db.query.logAbsensi.findFirst({
         where: eq(logAbsensi.id, input.id),
       });
-      if (!log) throw new Error("Log tidak ditemukan.");
+      if (!log)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Log tidak ditemukan.",
+        });
 
       // Update field yang disediakan
       const updateData: any = {};
@@ -374,7 +393,10 @@ export const aktivitasRouter = createTRPCRouter({
       });
 
       if (!peserta) {
-        throw new Error(`NIPD ${input.nipd} tidak terdaftar di sistem.`);
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: `NIPD ${input.nipd} tidak terdaftar di sistem.`,
+        });
       }
 
       // 2. Cari Sesi
@@ -382,25 +404,37 @@ export const aktivitasRouter = createTRPCRouter({
         where: eq(sesiAbsensi.id, input.sesiId),
       });
 
-      if (!sesi) throw new Error("Sesi jadwal tidak valid.");
+      if (!sesi)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Sesi tidak terdaftar pada sistem.",
+        });
+
+      if (!sesi.isActive)
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Sesi ini tidak aktif.",
+        });
 
       // 3. Validasi Target Jenjang Sesi
       const isTargetedJenjang = sesi.targetJenjang.includes(
         peserta.kelas.jenjang,
       );
       if (!isTargetedJenjang) {
-        throw new Error(
-          `Siswa jenjang ${peserta.kelas.jenjang} tidak ditugaskan untuk sesi ini.`,
-        );
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Siswa jenjang ${peserta.kelas.jenjang} tidak ditugaskan untuk sesi ini.`,
+        });
       }
 
       // TAMBAHAN BARU: Validasi Agama Peserta
       // Memastikan anak Non-Is tidak bisa absen di kegiatan Islam, dan sebaliknya
       const isTargetedAgama = sesi.targetAgama.includes(peserta.agama);
       if (!isTargetedAgama) {
-        throw new Error(
-          `Sesi ini tidak diperuntukkan bagi peserta didik beragama ${peserta.agama}.`,
-        );
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Sesi ini tidak diperuntukkan bagi peserta didik beragama ${peserta.agama}.`,
+        });
       }
 
       // 4. Kalkulasi Waktu (Tepat Waktu vs Telat)
@@ -444,13 +478,15 @@ export const aktivitasRouter = createTRPCRouter({
         });
       } catch (error: any) {
         if (error.code === "23505") {
-          throw new Error(
-            `Siswa atas nama ${peserta.namaLengkap} sudah diabsen untuk kegiatan ini.`,
-          );
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: `Siswa atas nama ${peserta.namaLengkap} sudah diabsen untuk kegiatan ini.`,
+          });
         }
-        throw new Error(
-          "Terjadi kesalahan sistem saat menyimpan data absensi.",
-        );
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Terjadi kesalahan sistem saat menyimpan data absensi.",
+        });
       }
 
       return peserta;
@@ -470,24 +506,41 @@ export const aktivitasRouter = createTRPCRouter({
         where: eq(pesertaDidik.uidKartu, input.uidKartu.toUpperCase()),
         with: { kelas: true },
       });
-      if (!peserta) throw new Error("Kartu tidak dikenali / belum terdaftar.");
+      if (!peserta)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Kartu tidak dikenali / belum terdaftar.",
+        });
 
       // 2. Cari sesi
       const sesi = await ctx.db.query.sesiAbsensi.findFirst({
         where: eq(sesiAbsensi.id, input.sesiId),
       });
-      if (!sesi) throw new Error("Sesi jadwal tidak valid.");
+
+      if (!sesi)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Sesi tidak terdaftar pada sistem.",
+        });
+
+      if (!sesi.isActive)
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Sesi ini tidak aktif.",
+        });
 
       // 3. Validasi target jenjang & agama
       if (!sesi.targetJenjang.includes(peserta.kelas.jenjang))
-        throw new Error(
-          `Siswa jenjang ${peserta.kelas.jenjang} tidak ditugaskan pada sesi ini.`,
-        );
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Siswa jenjang ${peserta.kelas.jenjang} tidak ditugaskan pada sesi ini.`,
+        });
 
       if (!sesi.targetAgama.includes(peserta.agama))
-        throw new Error(
-          `Sesi ini tidak diperuntukkan bagi peserta beragama ${peserta.agama}.`,
-        );
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Sesi ini tidak diperuntukkan bagi peserta beragama ${peserta.agama}.`,
+        });
 
       // 4. Kalkulasi Waktu Lokal berdasarkan timeZone perangkat
       const nowUtc = new Date();
@@ -523,10 +576,12 @@ export const aktivitasRouter = createTRPCRouter({
           eq(logAbsensi.tanggal, tanggalFormat),
         ),
       });
+
       if (existing)
-        throw new Error(
-          `Siswa atas nama ${peserta.namaLengkap} sudah diabsen pada sesi ini.`,
-        );
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: `Siswa atas nama ${peserta.namaLengkap} sudah diabsen pada sesi ini.`,
+        });
 
       // 7. Simpan log
       await ctx.db.insert(logAbsensi).values({

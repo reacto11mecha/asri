@@ -74,7 +74,8 @@ export default function ScannerPage() {
         kategoriId: k.id,
         namaKategori: k.namaKategori,
         sesi: k.sesi.filter((s) => {
-          // Jika tidak ada waktu, lewati filter waktu
+          if (!s.isActive) return false;
+
           if (!s.waktuMulai || !s.waktuSelesai) {
             if (!searchSesi) return true;
             const keyword = searchSesi.toLowerCase();

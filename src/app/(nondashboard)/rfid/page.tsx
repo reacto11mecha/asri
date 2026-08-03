@@ -66,6 +66,8 @@ export default function RfidPage() {
         kategoriId: k.id,
         namaKategori: k.namaKategori,
         sesi: k.sesi.filter((s) => {
+          if (!s.isActive) return false;
+
           if (!s.waktuMulai || !s.waktuSelesai) {
             if (!searchSesi) return true;
             const keyword = searchSesi.toLowerCase();
