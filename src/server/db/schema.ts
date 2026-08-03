@@ -6,6 +6,7 @@ import {
   pgEnum,
   pgTable,
   jsonb,
+  varchar,
   text,
   time,
   timestamp,
@@ -62,6 +63,7 @@ export const user = pgTable("user", {
   jabatanId: text("jabatan_id").references(() => masterJabatan.id, {
     onDelete: "set null",
   }),
+  nip: varchar("nip", { length: 50 }),
   image: text("image"),
   createdAt: timestamp("created_at")
     .$defaultFn(() => /* @__PURE__ */ new Date())

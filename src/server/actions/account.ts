@@ -4,20 +4,29 @@ import { redirect } from "next/navigation";
 import { auth } from "~/server/better-auth";
 import { getSession } from "~/server/better-auth/server";
 import { headers } from "next/headers";
+import { db } from "~/server/db";
+import { user } from "~/server/db/schema";
+import { eq } from "drizzle-orm";
 
-// ======================== UPDATE NAMA ========================
-export async function updateName(newName: string) {
+// ======================== UPDATE PROFIL ========================
+export async function updateProfile(newName: string, newNip: string | null) {
   const session = await getSession();
 
   if (!session) throw new Error("Anda harus login.");
 
-  // Update nama user melalui method bawaan Better Auth
+  // 1. Update nama melalui method bawaan Better Auth
   await auth.api.updateUser({
     body: {
       name: newName,
     },
     headers: await headers(),
   });
+
+  // 2. Update NIP langsung ke tabel user menggunakan Drizzle ORM
+  await db
+    .update(user)
+    .set({ nip: newNip })
+    .where(eq(user.id, session.user.id));
 
   return { success: true };
 }
@@ -28,7 +37,6 @@ export async function checkHasPassword(): Promise<boolean> {
 
   if (!session) throw new Error("Anda harus login.");
 
-  // Ambil daftar akun user; jika ada provider "credential" berarti sudah punya password
   const accounts = await auth.api.listUserAccounts({
     headers: await headers(),
   });
@@ -82,14 +90,13 @@ export async function getSessions() {
     headers: await headers(),
   });
 
-  // Tandai sesi yang sedang digunakan
   return sessions.map((s) => ({
     id: s.id,
     token: s.token,
     ipAddress: s.ipAddress,
     userAgent: s.userAgent,
     createdAt: s.createdAt,
-    isCurrent: s.token === currentSession.session.token,
+    isCurrent: s.id === currentSession.session.id,
   }));
 }
 
@@ -98,9 +105,16 @@ export async function getCurrentUser() {
 
   if (!session) throw new Error("Anda harus login.");
 
+  // Ambil NIP langsung dari database karena atribut custom
+  const userData = await db.query.user.findFirst({
+    where: eq(user.id, session.user.id),
+    columns: { nip: true },
+  });
+
   return {
     name: session.user.name,
     email: session.user.email,
+    nip: userData?.nip || null,
   };
 }
 
@@ -109,4 +123,29 @@ export async function logoutAction() {
     headers: await headers(),
   });
   redirect("/login");
+}
+
+// ======================== CABUT SESI SPESIFIK ========================
+export async function revokeSessionAction(token: string) {
+  const session = await getSession();
+  if (!session) throw new Error("Anda harus login.");
+
+  await auth.api.revokeSession({
+    body: { token },
+    headers: await headers(),
+  });
+
+  return { success: true };
+}
+
+// ======================== CABUT SEMUA SESI LAIN ========================
+export async function revokeOtherSessionsAction() {
+  const session = await getSession();
+  if (!session) throw new Error("Anda harus login.");
+
+  await auth.api.revokeOtherSessions({
+    headers: await headers(),
+  });
+
+  return { success: true };
 }
