@@ -3,6 +3,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { format } from "date-fns";
 import { id as localeId } from "date-fns/locale";
+import type { RouterOutputs } from "~/trpc/react";
 
 // ==========================================
 // 1. INTERFACES & TYPES
@@ -31,15 +32,6 @@ export interface PdfDataPayload {
     keterangan: string | null;
   }>;
   isSpecificKelas?: boolean;
-}
-
-export interface ProfilPeserta {
-  namaLengkap: string;
-  nipd: string | null;
-  nisn: string | null;
-  kelas: { tingkat: string; namaKelas: string; jenjang: string } | null;
-  waliAsuh: { name: string | null } | null;
-  jenisKelamin?: string | null;
 }
 
 export interface LaporanMonev {
@@ -83,7 +75,7 @@ export interface FormKasusValues {
 }
 
 export interface KasusPdfPayload {
-  pesertaDidik: ProfilPeserta;
+  pesertaDidik: RouterOutputs["bimbingan"]["getDetailKasus"]["pesertaDidik"];
   tanggalBuka: string | Date;
   formValues: FormKasusValues;
 }
@@ -312,7 +304,7 @@ export async function generateLaporanSesiPdf(data: PdfDataPayload) {
 
 export async function generateMonevPDF(
   item: LaporanMonev,
-  profil: ProfilPeserta,
+  profil: RouterOutputs["peserta"]["getById"],
 ) {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -463,10 +455,10 @@ export async function generateMonevPDF(
   const signRightX = pageWidth - 80;
   const dateStr = format(new Date(), "dd MMMM yyyy", { locale: localeId });
   doc.text(`Bekasi, ${dateStr}`, signRightX, currentY);
-  currentY += 6;
+  currentY += 5;
   doc.text("Wali Asuh,", signRightX, currentY);
 
-  currentY += 18;
+  currentY += 20;
 
   doc.setFont("helvetica", "bold");
   // Nama Terang Tanpa Tanda Kurung
@@ -475,6 +467,8 @@ export async function generateMonevPDF(
     signRightX,
     currentY,
   );
+  doc.setFont("helvetica", "normal");
+  doc.text(`NIP. ${profil.waliAsuh?.nip ?? "-"}`, signRightX, currentY + 5);
 
   doc.save(
     `Monev_${item.monevKe}_${profil.namaLengkap.replace(/\s+/g, "_")}.pdf`,
@@ -606,6 +600,8 @@ export async function generateKasusPDF(data: KasusPdfPayload) {
   // Mencetak nama wali asuh (dibuat bold agar seragam)
   doc.setFont("helvetica", "bold");
   doc.text(pesertaDidik.waliAsuh?.name || "Nama Wali", 20, currentY);
+  doc.setFont("helvetica", "normal");
+  doc.text(`NIP. ${pesertaDidik.waliAsuh?.nip ?? "-"}`, 20, currentY + 5);
 
   doc.save(
     `Laporan_Kasus_${pesertaDidik.namaLengkap.replace(/\s+/g, "_")}.pdf`,
