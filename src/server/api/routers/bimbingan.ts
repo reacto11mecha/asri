@@ -423,7 +423,7 @@ export const bimbinganRouter = createTRPCRouter({
           pesertaDidik: {
             with: {
               kelas: true,
-              waliAsuh: { columns: { name: true } },
+              waliAsuh: { columns: { name: true, nip: true } },
             },
           },
         },

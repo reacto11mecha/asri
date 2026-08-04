@@ -160,7 +160,7 @@ export default function DetailKasusPage() {
   useEffect(() => {
     if (kasus) {
       const hmDefault = [1, 2, 3, 4, 5].map((m) => {
-        const found = kasus.hasilMonev?.find((x: any) => x.mingguKe === m);
+        const found = kasus.hasilMonev?.find((x) => x.mingguKe === m);
         return { mingguKe: m, deskripsi: found ? found.deskripsi : "" };
       });
 

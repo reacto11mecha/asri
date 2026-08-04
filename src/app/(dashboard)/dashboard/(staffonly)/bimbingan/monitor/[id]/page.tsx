@@ -523,9 +523,9 @@ export default function DetailMonitoringPage() {
                             size="sm"
                             variant="outline"
                             className="h-8"
-                            onClick={() =>
-                              generateMonevPDF(item as any, profil as any)
-                            }
+                            onClick={() => {
+                              if (profil) generateMonevPDF(item, profil);
+                            }}
                           >
                             <FileText className="mr-2 h-3.5 w-3.5" /> Cetak
                           </Button>

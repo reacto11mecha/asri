@@ -124,6 +124,7 @@ export const pesertaRouter = createTRPCRouter({
           waliAsuh: {
             columns: {
               name: true,
+              nip: true,
             },
           },
         },
