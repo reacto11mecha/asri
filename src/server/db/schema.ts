@@ -179,6 +179,7 @@ export const sesiAbsensi = pgTable("sesi_absensi", {
   poinTelat: integer("poin_telat").notNull(),
   poinAlfa: integer("poin_alfa").notNull().default(-20),
 
+  isLateEnabled: boolean("is_late_enabled").default(true).notNull(),
   isActive: boolean("is_active").default(true).notNull(),
 });
 

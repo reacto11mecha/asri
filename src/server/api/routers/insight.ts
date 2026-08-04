@@ -201,12 +201,14 @@ export const insightRouter = createTRPCRouter({
         );
 
       // Untuk setiap sesi, kita perlu mencocokkan dengan peserta yang memenuhi target
-      const grouped = sesiList.map((sesi) => {
-        const pesertaSesi = pesertaList.filter((p) =>
-          sesi.targetAgama.includes(p.agama),
-        );
-        return { sesi, pesertaSesi };
-      });
+      const grouped = sesiList
+        .map((sesi) => {
+          const pesertaSesi = pesertaList.filter((p) =>
+            sesi.targetAgama.includes(p.agama),
+          );
+          return { sesi, pesertaSesi };
+        })
+        .filter((group) => group.pesertaSesi.length > 0);
 
       // Ambil logAbsensi untuk semua peserta-sesi pada tanggal tsb
       const allLogs = await ctx.db
@@ -275,7 +277,7 @@ export const insightRouter = createTRPCRouter({
               statusKehadiran,
               statusWaktu,
               poinDidapat: poin,
-              keterangan: log?.keterangan ?? "Tidak melakukan absensi",
+              keterangan: log?.keterangan ?? null,
             });
           }
         }

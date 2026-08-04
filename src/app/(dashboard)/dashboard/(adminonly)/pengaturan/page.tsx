@@ -118,7 +118,7 @@ export default function PengaturanPage() {
                         <TableRow>
                           <TableHead>Nama Sesi</TableHead>
                           <TableHead>Waktu</TableHead>
-                          <TableHead>Kewajiban</TableHead>
+                          <TableHead>Aturan</TableHead>
                           <TableHead>Target Jenjang</TableHead>
                           <TableHead>Poin (Tepat / Telat / Alfa)</TableHead>
                           <TableHead className="text-right">Aksi</TableHead>
@@ -137,11 +137,21 @@ export default function PengaturanPage() {
                               {sesi.waktuMulai} - {sesi.waktuSelesai}
                             </TableCell>
                             <TableCell>
-                              {sesi.isMandatory ? (
-                                <Badge>Wajib</Badge>
-                              ) : (
-                                <Badge variant="secondary">Opsional</Badge>
-                              )}
+                              <div className="flex flex-wrap gap-1.5">
+                                {sesi.isMandatory ? (
+                                  <Badge>Wajib</Badge>
+                                ) : (
+                                  <Badge variant="secondary">Opsional</Badge>
+                                )}
+                                {!sesi.isLateEnabled && (
+                                  <Badge
+                                    variant="outline"
+                                    className="border-amber-200 bg-amber-50 text-amber-600"
+                                  >
+                                    Bebas Telat
+                                  </Badge>
+                                )}
+                              </div>
                             </TableCell>
                             <TableCell>
                               {sesi.targetJenjang.join(", ")}

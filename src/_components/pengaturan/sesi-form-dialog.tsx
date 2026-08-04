@@ -16,7 +16,6 @@ import {
 import { Input } from "~/components/ui/input";
 import {
   Field,
-  FieldContent,
   FieldDescription,
   FieldError,
   FieldGroup,
@@ -51,6 +50,7 @@ const formSchema = z.object({
   poinTepatWaktu: z.coerce.number(),
   poinTelat: z.coerce.number(),
   poinAlfa: z.coerce.number(),
+  isLateEnabled: z.boolean(),
   isActive: z.boolean(),
 });
 
@@ -93,7 +93,8 @@ export function SesiFormDialog({
         : [...AGAMA_OPTIONS],
       poinTepatWaktu: initialData?.poinTepatWaktu || 0,
       poinTelat: initialData?.poinTelat || 0,
-      poinAlfa: initialData?.poinAlfa || -20, // default -20
+      poinAlfa: initialData?.poinAlfa || -20,
+      isLateEnabled: initialData?.isLateEnabled ?? true,
       isActive: initialData?.isActive ?? true,
     },
   });
@@ -387,6 +388,36 @@ export function SesiFormDialog({
           />
 
           {/* Checkbox Boolean */}
+          <Controller
+            name="isLateEnabled"
+            control={form.control}
+            render={({ field, fieldState }) => (
+              <Field
+                orientation="horizontal"
+                data-invalid={fieldState.invalid}
+                className="items-center gap-2"
+              >
+                <input
+                  type="checkbox"
+                  id="isLateEnabled"
+                  checked={field.value}
+                  onChange={field.onChange}
+                  className="h-4 w-4"
+                  aria-invalid={fieldState.invalid}
+                />
+                <FieldLabel htmlFor="isLateEnabled" className="font-medium">
+                  Aktifkan Hitung Telat
+                </FieldLabel>
+                <FieldDescription className="ml-6 block text-xs">
+                  Jika dinonaktifkan, absensi di luar jam hanya akan dihitung
+                  Hadir atau Alfa.
+                </FieldDescription>
+                {fieldState.invalid && (
+                  <FieldError errors={[fieldState.error]} />
+                )}
+              </Field>
+            )}
+          />
           <Controller
             name="isMandatory"
             control={form.control}

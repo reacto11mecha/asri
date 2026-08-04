@@ -1,0 +1,1 @@
+ALTER TABLE "sesi_absensi" ADD COLUMN "is_late_enabled" boolean DEFAULT true NOT NULL;

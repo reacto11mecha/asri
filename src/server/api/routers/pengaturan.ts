@@ -235,6 +235,7 @@ export const pengaturanRouter = createTRPCRouter({
         poinTepatWaktu: z.number(),
         poinTelat: z.number(),
         poinAlfa: z.number(),
+        isLateEnabled: z.boolean().default(true),
         isActive: z.boolean().default(true),
       }),
     )
@@ -250,6 +251,7 @@ export const pengaturanRouter = createTRPCRouter({
         poinTepatWaktu: input.poinTepatWaktu,
         poinTelat: input.poinTelat,
         poinAlfa: input.poinAlfa,
+        isLateEnabled: input.isLateEnabled,
         isActive: input.isActive,
       });
     }),
@@ -281,6 +283,7 @@ export const pengaturanRouter = createTRPCRouter({
         poinTepatWaktu: z.number(),
         poinTelat: z.number(),
         poinAlfa: z.number(),
+        isLateEnabled: z.boolean(),
         isActive: z.boolean(),
       }),
     )
@@ -297,6 +300,7 @@ export const pengaturanRouter = createTRPCRouter({
           poinTepatWaktu: input.poinTepatWaktu,
           poinTelat: input.poinTelat,
           poinAlfa: input.poinAlfa,
+          isLateEnabled: input.isLateEnabled,
           isActive: input.isActive,
         })
         .where(eq(sesiAbsensi.id, input.id));
