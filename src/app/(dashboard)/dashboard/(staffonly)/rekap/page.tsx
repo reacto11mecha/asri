@@ -103,7 +103,7 @@ export default function RekapPage() {
       if (!isSemuaKelas) {
         const kelasTerpilih = daftarKelas.find((k) => k.id === pdfKelasId);
         if (kelasTerpilih) {
-          targetLabel = `Kelas ${kelasTerpilih.tingkat} ${kelasTerpilih.namaKelas}`;
+          targetLabel = `Kelas ${kelasTerpilih.tingkat} ${kelasTerpilih.namaKelas} (${pdfJenjang})`;
         }
       }
 
