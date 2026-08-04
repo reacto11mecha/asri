@@ -197,7 +197,7 @@ export async function generateLaporanSesiPdf(data: PdfDataPayload) {
     locale: localeId,
   });
   doc.text(
-    `Target: ${data.targetLabel}  |  Kegiatan: ${data.sesiInfo.namaSesi} (${data.sesiInfo.kategori.namaKategori})  |  Tanggal Aktivitas: ${formattedDate}`,
+    `${data.targetLabel}  | Kegiatan: ${data.sesiInfo.namaSesi} |  Tanggal: ${formattedDate}`,
     pageWidth / 2,
     startY + 6,
     { align: "center" },
