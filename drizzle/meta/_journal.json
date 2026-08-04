@@ -29,6 +29,13 @@
       "when": 1785770056043,
       "tag": "0003_cute_kylun",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1785857890475,
+      "tag": "0004_sturdy_living_tribunal",
+      "breakpoints": true
     }
   ]
 }

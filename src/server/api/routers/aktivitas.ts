@@ -449,7 +449,11 @@ export const aktivitasRouter = createTRPCRouter({
       let statusWaktu: "TEPAT_WAKTU" | "TELAT" = "TEPAT_WAKTU";
       let poin = sesi.poinTepatWaktu;
 
-      if (sesi.waktuSelesai && currentTimeString > sesi.waktuSelesai) {
+      if (
+        sesi.isLateEnabled &&
+        sesi.waktuSelesai &&
+        currentTimeString > sesi.waktuSelesai
+      ) {
         statusWaktu = "TELAT";
         poin = sesi.poinTelat; // Poin minus atau 0 yang sudah diset di database
       }
@@ -554,7 +558,11 @@ export const aktivitasRouter = createTRPCRouter({
       let statusWaktu: "TEPAT_WAKTU" | "TELAT" = "TEPAT_WAKTU";
       let poin = sesi.poinTepatWaktu;
 
-      if (sesi.waktuSelesai && currentTimeString > sesi.waktuSelesai) {
+      if (
+        sesi.isLateEnabled &&
+        sesi.waktuSelesai &&
+        currentTimeString > sesi.waktuSelesai
+      ) {
         statusWaktu = "TELAT";
         poin = sesi.poinTelat;
       }
