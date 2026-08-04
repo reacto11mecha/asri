@@ -84,8 +84,9 @@ export default function RfidPage() {
 
           const startMinutes = startH * 60 + startM;
           const endMinutes = endH * 60 + endM;
+
           if (currentMinutes < startMinutes - 30) return false;
-          if (currentMinutes > endMinutes + 60) return false;
+          if (currentMinutes > endMinutes + 15) return false;
 
           if (!searchSesi) return true;
           const keyword = searchSesi.toLowerCase();
