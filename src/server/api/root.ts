@@ -4,6 +4,7 @@ import { aktivitasRouter } from "~/server/api/routers/aktivitas";
 import { insightRouter } from "~/server/api/routers/insight";
 import { bimbinganRouter } from "~/server/api/routers/bimbingan";
 import { rekapRouter } from "~/server/api/routers/rekap";
+import { pantauanRouter } from "~/server/api/routers/pantauan";
 import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
 
 /**
@@ -17,6 +18,7 @@ export const appRouter = createTRPCRouter({
   aktivitas: aktivitasRouter,
   insight: insightRouter,
   rekap: rekapRouter,
+  pantauan: pantauanRouter,
   bimbingan: bimbinganRouter,
 });
 

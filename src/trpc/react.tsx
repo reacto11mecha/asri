@@ -55,6 +55,26 @@ export function TRPCReactProvider(props: { children: React.ReactNode }) {
           headers: () => {
             const headers = new Headers();
             headers.set("x-trpc-source", "nextjs-react");
+
+            if (typeof window !== "undefined") {
+              const storedAuth = localStorage.getItem("parent_auth_session");
+              if (storedAuth) {
+                try {
+                  const parsed = JSON.parse(storedAuth);
+                  if (parsed.nipd && parsed.birthdate) {
+                    headers.set("x-nipd", parsed.nipd);
+                    headers.set("x-birthdate", parsed.birthdate);
+                  }
+                } catch (e) {
+                  console.error(
+                    "Gagal membaca sesi orang tua untuk TRPC Header",
+                    e,
+                  );
+                }
+              }
+            }
+            // ====================================================
+
             return headers;
           },
         }),

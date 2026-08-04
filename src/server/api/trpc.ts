@@ -14,7 +14,7 @@ import { and, eq, inArray, isNotNull } from "drizzle-orm";
 
 import { auth } from "~/server/better-auth";
 import { db } from "~/server/db";
-import { user, masterJabatan } from "~/server/db/schema";
+import { user, masterJabatan, pesertaDidik } from "~/server/db/schema";
 
 /**
  * 1. CONTEXT
@@ -188,3 +188,56 @@ const procedureConstructor = (
 
 export const superAdminProcedure = procedureConstructor(["SUPERADMIN"]);
 export const staffProcedure = procedureConstructor(["SUPERADMIN", "STAFF"]);
+
+export const parentProcedure = t.procedure
+  .use(timingMiddleware)
+  .use(async ({ ctx, next }) => {
+    // 1. Menggunakan prefix x- untuk custom headers
+    const nipd = ctx.headers.get("x-nipd") ?? null;
+    const birthdate = ctx.headers.get("x-birthdate") ?? null;
+
+    if (!nipd || !birthdate) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Kredensial tidak lengkap.",
+      });
+    }
+
+    // 2. Menggunakan ctx.db dan 3. Membatasi kolom (Data Minimization)
+    const student = await ctx.db.query.pesertaDidik.findFirst({
+      where: and(
+        eq(pesertaDidik.nipd, nipd),
+        eq(pesertaDidik.tanggalLahir, birthdate),
+      ),
+      columns: {
+        id: true,
+        nipd: true,
+        namaLengkap: true,
+        tanggalLahir: true,
+      },
+      with: {
+        kelas: true,
+        waliAsuh: {
+          columns: {
+            name: true,
+            id: true,
+          },
+        },
+      },
+    });
+
+    if (!student) {
+      throw new TRPCError({
+        code: "UNAUTHORIZED",
+        message: "Anak tidak ditemukan atau identitas salah.",
+      });
+    }
+
+    return next({
+      ctx: {
+        ...ctx,
+        // Buat namespace khusus agar tidak rancu dengan 'session' milik user Better Auth
+        parentAuth: { student },
+      },
+    });
+  });
