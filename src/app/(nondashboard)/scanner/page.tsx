@@ -96,7 +96,7 @@ export default function ScannerPage() {
 
           // Rentang waktu yang diizinkan
           if (currentMinutes < startMinutes - 30) return false;
-          if (currentMinutes > endMinutes + 60) return false;
+          if (currentMinutes > endMinutes + 15) return false;
 
           if (!searchSesi) return true;
           const keyword = searchSesi.toLowerCase();
