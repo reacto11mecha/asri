@@ -401,30 +401,37 @@ export default function DashboardInsightPage() {
                             {grupSesi.siswaBermasalah.map((siswa) => (
                               <div
                                 key={siswa.logId}
-                                className="bg-background flex items-center justify-between rounded-md border p-3 shadow-sm"
+                                className="bg-background flex flex-col rounded-md border p-3 shadow-sm"
                               >
-                                <div>
-                                  <p className="font-semibold">
-                                    {siswa.peserta.namaLengkap}
-                                  </p>
-                                  <p className="text-muted-foreground text-xs">
-                                    {siswa.kelas.tingkat}{" "}
-                                    {siswa.kelas.namaKelas}
-                                  </p>
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <p className="font-semibold">
+                                      {siswa.peserta.namaLengkap}
+                                    </p>
+                                    <p className="text-muted-foreground text-xs">
+                                      {siswa.kelas.tingkat}{" "}
+                                      {siswa.kelas.namaKelas}
+                                    </p>
+                                  </div>
+                                  <div className="flex flex-col items-end gap-1">
+                                    {siswa.logId.startsWith("missing-")
+                                      ? getStatusBadge("ALFA", true)
+                                      : getStatusBadge(siswa.statusKehadiran)}
+                                    <span
+                                      className={`font-mono text-xs font-bold ${siswa.poinDidapat < 0 ? "text-red-500" : "text-gray-700"}`}
+                                    >
+                                      {siswa.poinDidapat > 0
+                                        ? `+${siswa.poinDidapat}`
+                                        : siswa.poinDidapat}{" "}
+                                      Poin
+                                    </span>
+                                  </div>
                                 </div>
-                                <div className="flex flex-col items-end gap-1">
-                                  {siswa.logId.startsWith("missing-")
-                                    ? getStatusBadge("ALFA", true)
-                                    : getStatusBadge(siswa.statusKehadiran)}
-                                  <span
-                                    className={`font-mono text-xs font-bold ${siswa.poinDidapat < 0 ? "text-red-500" : "text-gray-700"}`}
-                                  >
-                                    {siswa.poinDidapat > 0
-                                      ? `+${siswa.poinDidapat}`
-                                      : siswa.poinDidapat}{" "}
-                                    Poin
-                                  </span>
-                                </div>
+                                {siswa.keterangan && (
+                                  <div className="bg-muted/40 text-muted-foreground mt-3 rounded border px-2.5 py-1.5 text-xs italic">
+                                    Catatan: {siswa.keterangan}
+                                  </div>
+                                )}
                               </div>
                             ))}
                           </div>
