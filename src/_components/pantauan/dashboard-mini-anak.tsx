@@ -61,9 +61,14 @@ export default function DasborMiniAnak({ onLogout }: DasborMiniAnakProps) {
       {/* Header Mobile: Latar belakang warna utama yang menyatu ke atas */}
       <div className="bg-primary px-4 pt-6 pb-24 shadow-md sm:px-6 lg:px-8">
         <div className="mx-auto flex max-w-3xl items-center justify-between">
-          <h1 className="text-primary-foreground text-xl font-bold tracking-tight">
-            Pantauan Asrama
-          </h1>
+          <div className="flex flex-col">
+            <h1 className="text-primary-foreground text-xl font-bold tracking-tight">
+              Aktivitas Peserta Didik
+            </h1>
+            <span className="text-primary-foreground/80 mt-1 text-sm font-medium">
+              SRT 1 Kabupaten Bekasi
+            </span>
+          </div>
           <Button
             variant="ghost"
             size="sm"
@@ -95,7 +100,8 @@ export default function DasborMiniAnak({ onLogout }: DasborMiniAnakProps) {
                 {profil?.kelas && (
                   <span className="flex items-center gap-1.5">
                     <BookOpen className="h-4 w-4" /> Kelas:{" "}
-                    {profil.kelas.tingkat} {profil.kelas.namaKelas}
+                    {profil.kelas.tingkat} {profil.kelas.namaKelas} (
+                    {profil.kelas.jenjang})
                   </span>
                 )}
               </div>
@@ -153,7 +159,7 @@ export default function DasborMiniAnak({ onLogout }: DasborMiniAnakProps) {
                     </div>
                     <div>
                       <p className="flex items-center gap-1 text-xs text-gray-400">
-                        <Clock className="h-3.5 w-3.5" /> Waktu Scan
+                        <Clock className="h-3.5 w-3.5" /> Waktu Tercatat
                       </p>
                       <p className="mt-0.5 font-medium">
                         {format(new Date(absen.waktuScan), "HH:mm")} WIB
@@ -171,11 +177,15 @@ export default function DasborMiniAnak({ onLogout }: DasborMiniAnakProps) {
                           {absen.pelanggaran.namaPelanggaran} (Poin:{" "}
                           {absen.pelanggaran.poinMinus})
                         </p>
+                        {absen.keterangan && (
+                          <p className="mt-1 text-xs text-red-700/80">
+                            {absen.keterangan}
+                          </p>
+                        )}
                       </div>
                     </div>
                   )}
 
-                  {/* Keterangan Tambahan (Misal: Alasan Sakit/Izin)[cite: 1] */}
                   {absen.keterangan && !absen.pelanggaran && (
                     <div className="mt-3 rounded-lg bg-gray-50 p-2.5 text-sm text-gray-600">
                       <span className="font-medium">Keterangan:</span>{" "}

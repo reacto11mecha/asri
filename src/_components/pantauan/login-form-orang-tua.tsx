@@ -56,6 +56,9 @@ export default function LoginFormOrangTua({
           <h2 className="mt-6 text-2xl font-bold tracking-tight text-gray-900">
             Portal Orang Tua
           </h2>
+          <p className="mt-1 text-sm font-semibold text-blue-600">
+            SRT 1 Kabupaten Bekasi
+          </p>
           <p className="mt-2 text-sm text-gray-600">
             Masukkan Nomor Induk Peserta Didik (NIPD) dan Tanggal Lahir anak
             Anda untuk memantau absensi.
