@@ -68,13 +68,7 @@ export function PesertaTable() {
   };
 
   const handleDelete = (id: string) => {
-    if (
-      confirm(
-        "Yakin ingin menghapus data peserta didik ini? Tindakan ini tidak dapat dibatalkan.",
-      )
-    ) {
-      deletePesertaMutation.mutate({ id });
-    }
+    deletePesertaMutation.mutate({ id });
   };
 
   const columns = useMemo(

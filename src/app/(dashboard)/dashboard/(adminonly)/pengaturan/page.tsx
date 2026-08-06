@@ -20,6 +20,8 @@ import { PelanggaranFormDialog } from "~/_components/pengaturan/pelanggaran-form
 import { LiburTab } from "~/_components/pengaturan/libur-tab";
 import { Trash2 } from "lucide-react";
 import { PegawaiTab } from "~/_components/pengaturan/pegawai-tab";
+import { AlertDialogTrigger } from "~/components/ui/alert-dialog";
+import { ForceDeleteDialog } from "~/components/ui/force-delete-dialog";
 
 export default function PengaturanPage() {
   const utils = api.useUtils();
@@ -90,21 +92,21 @@ export default function PengaturanPage() {
                     <div className="flex gap-2">
                       <SesiFormDialog kategoriId={kategori.id} />
                       <KategoriFormDialog initialData={kategori} />
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => {
-                          if (
-                            confirm(
-                              "Hapus kategori ini? Semua sesi terkait akan ikut terhapus.",
-                            )
-                          ) {
-                            deleteKategoriMutation.mutate({ id: kategori.id });
-                          }
-                        }}
+                      <ForceDeleteDialog
+                        title="Hapus Kategori Absensi?"
+                        itemName={kategori.namaKategori} // Nama kategori akan muncul di dialog
+                        onConfirm={() =>
+                          deleteKategoriMutation.mutate({ id: kategori.id })
+                        }
                       >
-                        <Trash2 className="mr-2 h-4 w-4" /> Hapus
-                      </Button>
+                        <AlertDialogTrigger
+                          render={
+                            <Button variant="destructive" size="sm">
+                              <Trash2 className="mr-2 h-4 w-4" /> Hapus
+                            </Button>
+                          }
+                        />
+                      </ForceDeleteDialog>
                     </div>
                   </div>
 
@@ -165,18 +167,28 @@ export default function PengaturanPage() {
                                 kategoriId={kategori.id}
                                 initialData={sesi}
                               />
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 w-8 p-0 text-red-500"
-                                onClick={() => {
-                                  if (confirm("Hapus sesi ini?")) {
-                                    deleteSesiMutation.mutate({ id: sesi.id });
-                                  }
-                                }}
+                              <ForceDeleteDialog
+                                title="Hapus Sesi Absensi?"
+                                itemName={sesi.namaSesi}
+                                onConfirm={() =>
+                                  deleteSesiMutation.mutate({ id: sesi.id })
+                                }
                               >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
+                                <AlertDialogTrigger
+                                  render={
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-8 w-8 p-0 text-red-500 hover:bg-red-50 hover:text-red-600"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                      <span className="sr-only">
+                                        Hapus Sesi
+                                      </span>
+                                    </Button>
+                                  }
+                                />
+                              </ForceDeleteDialog>
                             </TableCell>
                           </TableRow>
                         ))}

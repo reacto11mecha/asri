@@ -8,8 +8,9 @@ import {
   masterPelanggaran,
   masterJabatan,
   hariLibur,
+  logAbsensi,
 } from "~/server/db/schema";
-import { eq, asc, not, and } from "drizzle-orm";
+import { eq, asc, not, and, inArray } from "drizzle-orm";
 
 const regex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$/;
 
@@ -199,11 +200,27 @@ export const pengaturanRouter = createTRPCRouter({
 
   deleteKategori: superAdminProcedure
     .input(z.object({ id: z.string() }))
-    .mutation(async ({ ctx, input }) => {
-      await ctx.db
-        .delete(kategoriAbsensi)
-        .where(eq(kategoriAbsensi.id, input.id));
-    }),
+    .mutation(({ ctx, input }) =>
+      ctx.db.transaction(async (tx) => {
+        const sessions = await tx.query.sesiAbsensi.findMany({
+          where: eq(sesiAbsensi.kategoriId, input.id),
+          columns: { id: true },
+        });
+
+        if (sessions.length > 0) {
+          const sesiIds = sessions.map((s) => s.id);
+
+          await tx
+            .delete(logAbsensi)
+            .where(inArray(logAbsensi.sesiId, sesiIds));
+          await tx.delete(sesiAbsensi).where(inArray(sesiAbsensi.id, sesiIds));
+        }
+
+        await tx
+          .delete(kategoriAbsensi)
+          .where(eq(kategoriAbsensi.id, input.id));
+      }),
+    ),
 
   // ==========================================
   // CRUD SESI ABSENSI (Anak dari Kategori)
@@ -308,9 +325,12 @@ export const pengaturanRouter = createTRPCRouter({
 
   deleteSesi: superAdminProcedure
     .input(z.object({ id: z.string() }))
-    .mutation(async ({ ctx, input }) => {
-      await ctx.db.delete(sesiAbsensi).where(eq(sesiAbsensi.id, input.id));
-    }),
+    .mutation(async ({ ctx, input }) =>
+      ctx.db.transaction(async (tx) => {
+        await tx.delete(logAbsensi).where(eq(logAbsensi.sesiId, input.id));
+        await tx.delete(sesiAbsensi).where(eq(sesiAbsensi.id, input.id));
+      }),
+    ),
 
   // ==========================================
   // CRUD MASTER PELANGGARAN
