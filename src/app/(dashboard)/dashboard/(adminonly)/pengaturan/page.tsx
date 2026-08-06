@@ -20,87 +20,8 @@ import { PelanggaranFormDialog } from "~/_components/pengaturan/pelanggaran-form
 import { LiburTab } from "~/_components/pengaturan/libur-tab";
 import { Trash2 } from "lucide-react";
 import { PegawaiTab } from "~/_components/pengaturan/pegawai-tab";
-import { useState } from "react";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "~/components/ui/alert-dialog";
-import { Input } from "~/components/ui/input";
-
-function ForceDeleteDialog({
-  title,
-  itemName,
-  onConfirm,
-  trigger,
-}: {
-  title: string;
-  itemName: string;
-  onConfirm: () => void;
-  trigger: React.ReactElement; // Base UI membutuhkan element untuk prop `render`
-}) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [inputValue, setInputValue] = useState("");
-
-  const expectedText = `SAYA SADAR DAN MENGERTI KONSEKUENSINYA, HAPUS ${itemName}`.toUpperCase();
-  const isMatch = inputValue === expectedText;
-
-  return (
-    <AlertDialog open={isOpen} onOpenChange={setIsOpen}>
-      {/* Gunakan prop render untuk menyuntikkan tombol pemicu */}
-      <AlertDialogTrigger render={trigger} />
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{title}</AlertDialogTitle>
-          <AlertDialogDescription>
-            Tindakan ini tidak dapat dibatalkan. Semua data terkait (termasuk
-            riwayat absensi) akan ikut terhapus secara permanen.
-            <br />
-            <br />
-            Ketik{" "}
-            <strong className="bg-muted text-foreground pointer-events-none rounded px-1.5 py-0.5 select-none">
-              {expectedText}
-            </strong>{" "}
-            untuk melanjutkan:
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <Input
-          value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
-          onPaste={(e) => e.preventDefault()} // Cegah copy-paste
-          placeholder={expectedText}
-          className="mt-2"
-        />
-        <AlertDialogFooter>
-          <AlertDialogCancel onClick={() => setInputValue("")}>
-            Batal
-          </AlertDialogCancel>
-          {/* AlertDialogAction membawa fungsi close, kita timpa variant menggunakan prop render */}
-          <AlertDialogAction
-            render={<Button variant="destructive" disabled={!isMatch} />}
-            onClick={(e) => {
-              if (!isMatch) {
-                e.preventDefault(); // Mencegah dialog tertutup jika ada by-pass
-                return;
-              }
-              onConfirm();
-              setIsOpen(false);
-              setInputValue("");
-            }}
-          >
-            Hapus Permanen
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-  );
-}
+import { AlertDialogTrigger } from "~/components/ui/alert-dialog";
+import { ForceDeleteDialog } from "~/components/ui/force-delete-dialog";
 
 export default function PengaturanPage() {
   const utils = api.useUtils();
@@ -173,16 +94,19 @@ export default function PengaturanPage() {
                       <KategoriFormDialog initialData={kategori} />
                       <ForceDeleteDialog
                         title="Hapus Kategori Absensi?"
-                        itemName={kategori.namaKategori}
+                        itemName={kategori.namaKategori} // Nama kategori akan muncul di dialog
                         onConfirm={() =>
                           deleteKategoriMutation.mutate({ id: kategori.id })
                         }
-                        trigger={
-                          <Button variant="destructive" size="sm">
-                            <Trash2 className="mr-2 h-4 w-4" /> Hapus
-                          </Button>
-                        }
-                      />
+                      >
+                        <AlertDialogTrigger
+                          render={
+                            <Button variant="destructive" size="sm">
+                              <Trash2 className="mr-2 h-4 w-4" /> Hapus
+                            </Button>
+                          }
+                        />
+                      </ForceDeleteDialog>
                     </div>
                   </div>
 
@@ -249,16 +173,22 @@ export default function PengaturanPage() {
                                 onConfirm={() =>
                                   deleteSesiMutation.mutate({ id: sesi.id })
                                 }
-                                trigger={
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-8 w-8 p-0 text-red-500"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                }
-                              />
+                              >
+                                <AlertDialogTrigger
+                                  render={
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-8 w-8 p-0 text-red-500 hover:bg-red-50 hover:text-red-600"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                      <span className="sr-only">
+                                        Hapus Sesi
+                                      </span>
+                                    </Button>
+                                  }
+                                />
+                              </ForceDeleteDialog>
                             </TableCell>
                           </TableRow>
                         ))}

@@ -7,9 +7,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuTrigger,
-  DropdownMenuGroup,
 } from "~/components/ui/dropdown-menu";
 import {
   Select,
@@ -19,7 +17,9 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 import Link from "next/link";
+import { AlertDialogTrigger } from "~/components/ui/alert-dialog";
 import { Trash2, MoreHorizontal, Edit } from "lucide-react";
+import { ForceDeleteDialog } from "~/components/ui/force-delete-dialog";
 import { Button } from "~/components/ui/button";
 
 type Peserta = RouterOutputs["peserta"]["getAll"][number];
@@ -45,19 +45,19 @@ export const getPesertaColumns = ({
     cell: ({ row }) => {
       const peserta = row.original;
       return (
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            render={
-              <Button variant="ghost" className="h-8 w-8 p-0">
-                <span className="sr-only">Buka menu</span>
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            }
-          />
-          <DropdownMenuContent align="end">
-            <DropdownMenuGroup>
-              <DropdownMenuLabel>Aksi</DropdownMenuLabel>
-              {/* Tombol Edit me-routing ke halaman khusus */}
+        <ForceDeleteDialog
+          title="Hapus Data Peserta?"
+          itemName={peserta.namaLengkap}
+          onConfirm={() => onDelete(peserta.id)}
+        >
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={<Button variant="ghost" className="h-8 w-8 p-0" />}
+            >
+              <span className="sr-only">Buka menu</span>
+              <MoreHorizontal className="h-4 w-4" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
               <DropdownMenuItem
                 render={
                   <Link href={`/dashboard/peserta/edit/${peserta.id}`}>
@@ -65,15 +65,20 @@ export const getPesertaColumns = ({
                   </Link>
                 }
               />
-              <DropdownMenuItem
-                onClick={() => onDelete(peserta.id)}
-                className="text-red-600 focus:bg-red-50 focus:text-red-600"
-              >
-                <Trash2 className="mr-2 h-4 w-4" /> Hapus
-              </DropdownMenuItem>
-            </DropdownMenuGroup>
-          </DropdownMenuContent>
-        </DropdownMenu>
+
+              {/* Trigger diletakkan langsung merender DropdownMenuItem */}
+              <AlertDialogTrigger
+                nativeButton={false}
+                render={
+                  <DropdownMenuItem className="cursor-pointer text-red-600 focus:bg-red-50 focus:text-red-700">
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Hapus Peserta
+                  </DropdownMenuItem>
+                }
+              />
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </ForceDeleteDialog>
       );
     },
   },
