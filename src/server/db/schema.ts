@@ -25,6 +25,7 @@ export const statusAbsenEnum = pgEnum("status_absen", [
   "SAKIT",
   "ALFA",
   "LAINNYA",
+  "HAID",
 ]);
 export const tingkatPelanggaranEnum = pgEnum("tingkat_pelanggaran", [
   "TIDAK_ADA",
@@ -180,6 +181,7 @@ export const sesiAbsensi = pgTable("sesi_absensi", {
   poinAlfa: integer("poin_alfa").notNull().default(-20),
 
   isLateEnabled: boolean("is_late_enabled").default(true).notNull(),
+  isHaidExempt: boolean("is_haid_exempt").default(false).notNull(),
   isActive: boolean("is_active").default(true).notNull(),
 });
 
