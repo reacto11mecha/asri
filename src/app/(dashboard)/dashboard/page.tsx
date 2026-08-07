@@ -27,7 +27,7 @@ import {
   AccordionTrigger,
 } from "~/components/ui/accordion";
 import {
-  Trophy,
+  // Trophy,
   AlertTriangle,
   UserX,
   Clock,
@@ -49,6 +49,15 @@ const getStatusBadge = (status: string, isMissing?: boolean) => {
     );
 
   switch (status) {
+    case "HAID":
+      return (
+        <Badge
+          variant="outline"
+          className="border-pink-300 bg-pink-50 text-pink-600"
+        >
+          HAID
+        </Badge>
+      );
     case "HADIR":
       return (
         <Badge

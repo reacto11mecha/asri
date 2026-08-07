@@ -34,7 +34,7 @@ type LogEntry = RouterOutputs["aktivitas"]["getRecentLogs"]["data"][number];
 
 const formSchema = z.object({
   statusKehadiran: z
-    .enum(["HADIR", "IZIN", "SAKIT", "ALFA", "LAINNYA"])
+    .enum(["HADIR", "IZIN", "HAID", "SAKIT", "ALFA", "LAINNYA"])
     .optional(),
   statusWaktu: z.enum(["TEPAT_WAKTU", "TELAT"]).optional().nullable(),
   poinDidapat: z.coerce.number().optional(),
@@ -111,6 +111,7 @@ export function EditLogDialog({ log }: { log: LogEntry }) {
                     <SelectContent>
                       <SelectItem value="HADIR">Hadir</SelectItem>
                       <SelectItem value="IZIN">Izin</SelectItem>
+                      <SelectItem value="HAID">Haid</SelectItem>
                       <SelectItem value="SAKIT">Sakit</SelectItem>
                       <SelectItem value="ALFA">Alfa</SelectItem>
                       <SelectItem value="LAINNYA">Lainnya</SelectItem>

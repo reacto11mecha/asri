@@ -51,6 +51,7 @@ const formSchema = z.object({
   poinTelat: z.coerce.number(),
   poinAlfa: z.coerce.number(),
   isLateEnabled: z.boolean(),
+  isHaidExempt: z.boolean(),
   isActive: z.boolean(),
 });
 
@@ -95,6 +96,7 @@ export function SesiFormDialog({
       poinTelat: initialData?.poinTelat || 0,
       poinAlfa: initialData?.poinAlfa || -20,
       isLateEnabled: initialData?.isLateEnabled ?? true,
+      isHaidExempt: initialData?.isHaidExempt ?? false,
       isActive: initialData?.isActive ?? true,
     },
   });
@@ -418,6 +420,39 @@ export function SesiFormDialog({
               </Field>
             )}
           />
+
+          <Controller
+            name="isHaidExempt"
+            control={form.control}
+            render={({ field, fieldState }) => (
+              <Field
+                orientation="horizontal"
+                data-invalid={fieldState.invalid}
+                className="items-center gap-2"
+              >
+                <input
+                  type="checkbox"
+                  id="isHaidExempt"
+                  checked={field.value}
+                  onChange={field.onChange}
+                  className="h-4 w-4"
+                  aria-invalid={fieldState.invalid}
+                />
+                <FieldLabel htmlFor="isHaidExempt" className="font-medium">
+                  Gugur Kewajiban Saat Haid
+                </FieldLabel>
+                <FieldDescription className="ml-6 block text-xs">
+                  Jika diaktifkan, sistem bisa otomatis menandai sesi ini
+                  sebagai 'Haid' saat ada penginputan status Haid secara masal
+                  di hari tersebut.
+                </FieldDescription>
+                {fieldState.invalid && (
+                  <FieldError errors={[fieldState.error]} />
+                )}
+              </Field>
+            )}
+          />
+
           <Controller
             name="isMandatory"
             control={form.control}

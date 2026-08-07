@@ -153,6 +153,14 @@ export default function PengaturanPage() {
                                     Bebas Telat
                                   </Badge>
                                 )}
+                                {sesi.isHaidExempt && (
+                                  <Badge
+                                    variant="outline"
+                                    className="border-pink-200 bg-pink-50 text-pink-600"
+                                  >
+                                    Gugur Haid
+                                  </Badge>
+                                )}
                               </div>
                             </TableCell>
                             <TableCell>

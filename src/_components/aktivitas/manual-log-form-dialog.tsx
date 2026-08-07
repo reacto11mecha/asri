@@ -39,7 +39,8 @@ import { format } from "date-fns";
 
 const statusMap: Record<string, string> = {
   HADIR: "Hadir / Mengikuti",
-  SAKIT: "Sakit",
+  SAKIT: "Sakit Seharian",
+  HAID: "Haid Seharian",
   IZIN: "Izin",
   ALFA: "Alfa (Tanpa Keterangan)",
   LAINNYA: "Lain-lainnya",
@@ -55,6 +56,7 @@ const formSchema = z
     statusKehadiran: z.enum([
       "HADIR",
       "TIDAK_HADIR",
+      "HAID",
       "IZIN",
       "SAKIT",
       "ALFA",
@@ -65,7 +67,11 @@ const formSchema = z
     poinOverride: z.string().optional(),
   })
   .superRefine((data, ctx) => {
-    if (data.tipeLog === "SESI" && (!data.sesiId || data.sesiId === "")) {
+    if (
+      data.tipeLog === "SESI" &&
+      !["SAKIT", "HAID"].includes(data.statusKehadiran) &&
+      (!data.sesiId || data.sesiId === "")
+    ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "Sesi wajib dipilih",
@@ -253,7 +259,7 @@ export function ManualLogFormDialog() {
                             value={p.id}
                             className="cursor-pointer py-3"
                           >
-                            {p.namaLengkap} ({p.kelas.tingkat}{" "}
+                            {p.namaLengkap} ({p.kelas.jenjang} {p.kelas.tingkat}
                             {p.kelas.namaKelas})
                           </SelectItem>
                         ))
@@ -327,87 +333,92 @@ export function ManualLogFormDialog() {
                   <FieldSet>
                     <FieldLegend>Detail Kegiatan Rutin</FieldLegend>
                     <FieldGroup>
-                      <Controller
-                        name="kategoriId"
-                        control={form.control}
-                        render={({ field, fieldState }) => (
-                          <Field data-invalid={fieldState.invalid}>
-                            <FieldLabel htmlFor={field.name}>
-                              Kategori Kegiatan
-                            </FieldLabel>
-                            <Select
-                              name={field.name}
-                              value={field.value}
-                              onValueChange={(val) => {
-                                field.onChange(val);
-                                form.setValue("sesiId", "");
-                              }}
-                            >
-                              <SelectTrigger
-                                id={field.name}
-                                aria-invalid={fieldState.invalid}
-                                className="w-full"
-                              >
-                                <SelectValue placeholder="Pilih Kategori">
-                                  {selectedKategori?.namaKategori ?? undefined}
-                                </SelectValue>
-                              </SelectTrigger>
-                              <SelectContent>
-                                {options?.kategori.map((k) => (
-                                  <SelectItem key={k.id} value={k.id}>
-                                    {k.namaKategori}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            {fieldState.invalid && (
-                              <FieldError errors={[fieldState.error]} />
+                      {!["SAKIT", "HAID"].includes(selectedStatus) && (
+                        <>
+                          <Controller
+                            name="kategoriId"
+                            control={form.control}
+                            render={({ field, fieldState }) => (
+                              <Field data-invalid={fieldState.invalid}>
+                                <FieldLabel htmlFor={field.name}>
+                                  Kategori Kegiatan
+                                </FieldLabel>
+                                <Select
+                                  name={field.name}
+                                  value={field.value}
+                                  onValueChange={(val) => {
+                                    field.onChange(val);
+                                    form.setValue("sesiId", "");
+                                  }}
+                                >
+                                  <SelectTrigger
+                                    id={field.name}
+                                    aria-invalid={fieldState.invalid}
+                                    className="w-full"
+                                  >
+                                    <SelectValue placeholder="Pilih Kategori">
+                                      {selectedKategori?.namaKategori ??
+                                        undefined}
+                                    </SelectValue>
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {options?.kategori.map((k) => (
+                                      <SelectItem key={k.id} value={k.id}>
+                                        {k.namaKategori}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                {fieldState.invalid && (
+                                  <FieldError errors={[fieldState.error]} />
+                                )}
+                              </Field>
                             )}
-                          </Field>
-                        )}
-                      />
+                          />
 
-                      <Controller
-                        name="sesiId"
-                        control={form.control}
-                        render={({ field, fieldState }) => (
-                          <Field data-invalid={fieldState.invalid}>
-                            <FieldLabel htmlFor={field.name}>
-                              Sesi Jadwal{" "}
-                              <span className="text-red-500">*</span>
-                            </FieldLabel>
-                            <Select
-                              name={field.name}
-                              value={field.value}
-                              onValueChange={field.onChange}
-                              disabled={!selectedKategoriId}
-                            >
-                              <SelectTrigger
-                                id={field.name}
-                                aria-invalid={fieldState.invalid}
-                                className="w-full"
-                              >
-                                <SelectValue placeholder="Pilih Sesi">
-                                  {selectedSesi
-                                    ? `${selectedSesi.namaSesi}${formatSessionTime(selectedSesi.waktuMulai)}`
-                                    : undefined}
-                                </SelectValue>
-                              </SelectTrigger>
-                              <SelectContent>
-                                {filteredSesi.map((s) => (
-                                  <SelectItem key={s.id} value={s.id}>
-                                    {s.namaSesi}
-                                    {formatSessionTime(s.waktuMulai)}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            {fieldState.invalid && (
-                              <FieldError errors={[fieldState.error]} />
+                          <Controller
+                            name="sesiId"
+                            control={form.control}
+                            render={({ field, fieldState }) => (
+                              <Field data-invalid={fieldState.invalid}>
+                                <FieldLabel htmlFor={field.name}>
+                                  Sesi Jadwal{" "}
+                                  <span className="text-red-500">*</span>
+                                </FieldLabel>
+                                <Select
+                                  name={field.name}
+                                  value={field.value}
+                                  onValueChange={field.onChange}
+                                  disabled={!selectedKategoriId}
+                                >
+                                  <SelectTrigger
+                                    id={field.name}
+                                    aria-invalid={fieldState.invalid}
+                                    className="w-full"
+                                  >
+                                    <SelectValue placeholder="Pilih Sesi">
+                                      {selectedSesi
+                                        ? `${selectedSesi.namaSesi}${formatSessionTime(selectedSesi.waktuMulai)}`
+                                        : undefined}
+                                    </SelectValue>
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {filteredSesi.map((s) => (
+                                      <SelectItem key={s.id} value={s.id}>
+                                        {s.namaSesi}
+                                        {formatSessionTime(s.waktuMulai)}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                {fieldState.invalid && (
+                                  <FieldError errors={[fieldState.error]} />
+                                )}
+                              </Field>
                             )}
-                          </Field>
-                        )}
-                      />
+                          />
+                        </>
+                      )}
 
                       <Controller
                         name="statusKehadiran"
@@ -531,31 +542,33 @@ export function ManualLogFormDialog() {
                       )}
                     />
 
-                    <Controller
-                      name="poinOverride"
-                      control={form.control}
-                      render={({ field, fieldState }) => (
-                        <Field data-invalid={fieldState.invalid}>
-                          <FieldLabel htmlFor={field.name}>
-                            Override Poin
-                          </FieldLabel>
-                          <Input
-                            {...field}
-                            id={field.name}
-                            type="number"
-                            placeholder="Cth: -20"
-                            aria-invalid={fieldState.invalid}
-                            className="w-full"
-                          />
-                          <FieldDescription>
-                            Kosongkan untuk gunakan nilai default.
-                          </FieldDescription>
-                          {fieldState.invalid && (
-                            <FieldError errors={[fieldState.error]} />
-                          )}
-                        </Field>
-                      )}
-                    />
+                    {!["SAKIT", "HAID"].includes(selectedStatus) && (
+                      <Controller
+                        name="poinOverride"
+                        control={form.control}
+                        render={({ field, fieldState }) => (
+                          <Field data-invalid={fieldState.invalid}>
+                            <FieldLabel htmlFor={field.name}>
+                              Override Poin
+                            </FieldLabel>
+                            <Input
+                              {...field}
+                              id={field.name}
+                              type="number"
+                              placeholder="Cth: -20"
+                              aria-invalid={fieldState.invalid}
+                              className="w-full"
+                            />
+                            <FieldDescription>
+                              Kosongkan untuk gunakan nilai default.
+                            </FieldDescription>
+                            {fieldState.invalid && (
+                              <FieldError errors={[fieldState.error]} />
+                            )}
+                          </Field>
+                        )}
+                      />
+                    )}
 
                     <Controller
                       name="keterangan"

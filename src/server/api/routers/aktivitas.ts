@@ -30,6 +30,7 @@ const statusKehadiranEnum = z.enum([
   "HADIR",
   "TIDAK_HADIR",
   "IZIN",
+  "HAID",
   "SAKIT",
   "ALFA",
   "LAINNYA",
@@ -253,7 +254,15 @@ export const aktivitasRouter = createTRPCRouter({
         sesiId: z.string().optional().nullable(),
         pelanggaranId: z.string().optional().nullable(),
         statusKehadiran: z
-          .enum(["HADIR", "TIDAK_HADIR", "IZIN", "SAKIT", "ALFA", "LAINNYA"])
+          .enum([
+            "HADIR",
+            "TIDAK_HADIR",
+            "IZIN",
+            "HAID",
+            "SAKIT",
+            "ALFA",
+            "LAINNYA",
+          ])
           .default("HADIR"),
         keterangan: z.string().optional(),
         tanggal: z.string(),
@@ -261,6 +270,95 @@ export const aktivitasRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      // Pastikan peserta didik ada (kita butuh data agama dan jenjangnya)
+      const peserta = await ctx.db.query.pesertaDidik.findFirst({
+        where: eq(pesertaDidik.id, input.pesertaDidikId),
+        with: { kelas: true },
+      });
+
+      if (!peserta) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Data peserta didik tidak ditemukan.",
+        });
+      }
+
+      const now = new Date();
+
+      // ==========================================
+      // LOGIKA A: BULK INSERT (Sakit / Haid Seharian)
+      // ==========================================
+      if (
+        input.tipeLog === "SESI" &&
+        ["SAKIT", "HAID"].includes(input.statusKehadiran)
+      ) {
+        if (input.statusKehadiran === "HAID" && peserta.jenisKelamin === "L")
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message:
+              "Laki-laki tidak bisa haid. Mungkin anda salah peserta didik.",
+          });
+
+        // 1. Cari semua sesi wajib yang cocok dengan profil anak
+        const sesiWajib = await ctx.db.query.sesiAbsensi.findMany({
+          where: and(
+            eq(sesiAbsensi.isActive, true),
+            eq(sesiAbsensi.isMandatory, true),
+          ),
+        });
+
+        // Filter manual jika query SQL raw di atas sulit
+        let targetSesi = sesiWajib
+          .filter((s) => s.targetJenjang.includes(peserta.kelas.jenjang))
+          .filter((s) => s.targetAgama.includes(peserta.agama));
+
+        if (input.statusKehadiran === "HAID") {
+          targetSesi = targetSesi.filter((s) => s.isHaidExempt);
+        }
+
+        if (targetSesi.length === 0)
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Tidak ada jadwal sesi wajib untuk anak ini.",
+          });
+
+        // 2. Insert semua sesi kegiatan yang valid
+        await ctx.db.transaction(async (tx) => {
+          for (const sesi of targetSesi) {
+            await tx
+              .insert(logAbsensi)
+              .values({
+                pesertaDidikId: peserta.id,
+                sesiId: sesi.id,
+                waliAsuhId: ctx.session.user.id,
+                tanggal: input.tanggal,
+                waktuScan: now,
+                statusKehadiran: input.statusKehadiran,
+                statusWaktu: null,
+                poinDidapat: 0,
+                isPoinManual: false,
+                keterangan: input.keterangan,
+              })
+              .onConflictDoNothing({
+                // Syarat #3 Anda: "Belum ada catatannya pada tanggal yang dimaksud"
+                // Dengan DoNothing, jika sudah ada absen (misal subuh dia hadir),
+                // data subuh tidak akan tertimpa oleh status SAKIT ini.
+                target: [
+                  logAbsensi.tanggal,
+                  logAbsensi.sesiId,
+                  logAbsensi.pesertaDidikId,
+                ],
+              });
+          }
+        });
+
+        return;
+      }
+
+      // ==========================================
+      // LOGIKA B: SINGLE INSERT (Hadir, Izin, Telat, Pelanggaran)
+      // (Ini adalah kode original Anda)
+      // ==========================================
       let poinDidapat = 0;
       let isPoinManual = false;
       let statusWaktu: "TEPAT_WAKTU" | "TELAT" | null = null;
@@ -336,7 +434,15 @@ export const aktivitasRouter = createTRPCRouter({
       z.object({
         id: z.string(),
         statusKehadiran: z
-          .enum(["HADIR", "TIDAK_HADIR", "IZIN", "SAKIT", "ALFA", "LAINNYA"])
+          .enum([
+            "HADIR",
+            "TIDAK_HADIR",
+            "IZIN",
+            "HAID",
+            "SAKIT",
+            "ALFA",
+            "LAINNYA",
+          ])
           .optional(),
         statusWaktu: z.enum(["TEPAT_WAKTU", "TELAT"]).optional().nullable(),
         poinDidapat: z.number().optional(),
@@ -416,7 +522,7 @@ export const aktivitasRouter = createTRPCRouter({
           message: "Sesi ini tidak aktif.",
         });
 
-      // 3. Validasi Target Jenjang Sesi
+      // 3. Validasi Target Jenjang & Agama Sesi
       const isTargetedJenjang = sesi.targetJenjang.includes(
         peserta.kelas.jenjang,
       );
@@ -427,8 +533,6 @@ export const aktivitasRouter = createTRPCRouter({
         });
       }
 
-      // TAMBAHAN BARU: Validasi Agama Peserta
-      // Memastikan anak Non-Is tidak bisa absen di kegiatan Islam, dan sebaliknya
       const isTargetedAgama = sesi.targetAgama.includes(peserta.agama);
       if (!isTargetedAgama) {
         throw new TRPCError({
@@ -455,7 +559,7 @@ export const aktivitasRouter = createTRPCRouter({
         currentTimeString > sesi.waktuSelesai
       ) {
         statusWaktu = "TELAT";
-        poin = sesi.poinTelat; // Poin minus atau 0 yang sudah diset di database
+        poin = sesi.poinTelat;
       }
 
       // 5. Penanganan Tanggal Crossover (Tengah Malam)
@@ -466,30 +570,50 @@ export const aktivitasRouter = createTRPCRouter({
 
       const tanggalFormat = format(businessDate, "yyyy-MM-dd");
 
-      try {
-        // 6. Simpan Log Transaksi
+      // 6. Cek Duplikasi atau Overwrite Data
+      const existing = await ctx.db.query.logAbsensi.findFirst({
+        where: and(
+          eq(logAbsensi.pesertaDidikId, peserta.id),
+          eq(logAbsensi.sesiId, sesi.id),
+          eq(logAbsensi.tanggal, tanggalFormat),
+        ),
+      });
+
+      if (existing) {
+        // HANYA overwrite jika statusnya SAKIT atau HAID
+        if (["SAKIT", "HAID"].includes(existing.statusKehadiran)) {
+          await ctx.db
+            .update(logAbsensi)
+            .set({
+              waktuScan: nowUtc,
+              statusKehadiran: "HADIR",
+              statusWaktu: statusWaktu,
+              poinDidapat: poin,
+              isPoinManual: false,
+              keterangan: null, // Hapus keterangan SAKIT/HAID sebelumnya
+              waliAsuhId: ctx.session.user.id,
+            })
+            .where(eq(logAbsensi.id, existing.id));
+        } else {
+          // Jika statusnya HADIR, IZIN, ALFA, atau LAINNYA, lemparkan error
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: `Peserta didik atas nama ${peserta.namaLengkap} sudah tercatat dengan status ${existing.statusKehadiran} pada sesi ini.`,
+          });
+        }
+      } else {
+        // 7. Simpan log baru
         await ctx.db.insert(logAbsensi).values({
           pesertaDidikId: peserta.id,
           sesiId: sesi.id,
-          pelanggaranId: null, // Scanner bukan untuk pelanggaran
+          pelanggaranId: null,
           waliAsuhId: ctx.session.user.id,
           tanggal: tanggalFormat,
           waktuScan: nowUtc,
           statusKehadiran: "HADIR",
-          statusWaktu: statusWaktu,
+          statusWaktu,
           poinDidapat: poin,
-          isPoinManual: false, // Otomatis murni dari sistem
-        });
-      } catch (error: any) {
-        if (error.code === "23505") {
-          throw new TRPCError({
-            code: "CONFLICT",
-            message: `Siswa atas nama ${peserta.namaLengkap} sudah diabsen untuk kegiatan ini.`,
-          });
-        }
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Terjadi kesalahan sistem saat menyimpan data absensi.",
+          isPoinManual: false,
         });
       }
 
@@ -552,7 +676,6 @@ export const aktivitasRouter = createTRPCRouter({
         nowUtc.toLocaleString("en-US", { timeZone: input.timeZone }),
       );
 
-      // Gunakan date-fns untuk format jam
       const currentTimeString = format(localTime, "HH:mm:ss");
 
       let statusWaktu: "TEPAT_WAKTU" | "TELAT" = "TEPAT_WAKTU";
@@ -573,10 +696,9 @@ export const aktivitasRouter = createTRPCRouter({
         businessDate = subDays(localTime, 1);
       }
 
-      // Gunakan date-fns untuk format tanggal ke YYYY-MM-DD
       const tanggalFormat = format(businessDate, "yyyy-MM-dd");
 
-      // 6. Cek duplikasi
+      // 6. Cek duplikasi atau Overwrite Data
       const existing = await ctx.db.query.logAbsensi.findFirst({
         where: and(
           eq(logAbsensi.pesertaDidikId, peserta.id),
@@ -585,25 +707,43 @@ export const aktivitasRouter = createTRPCRouter({
         ),
       });
 
-      if (existing)
-        throw new TRPCError({
-          code: "CONFLICT",
-          message: `Siswa atas nama ${peserta.namaLengkap} sudah diabsen pada sesi ini.`,
+      if (existing) {
+        // HANYA overwrite jika statusnya SAKIT atau HAID
+        if (["SAKIT", "HAID"].includes(existing.statusKehadiran)) {
+          await ctx.db
+            .update(logAbsensi)
+            .set({
+              waktuScan: nowUtc,
+              statusKehadiran: "HADIR",
+              statusWaktu: statusWaktu,
+              poinDidapat: poin,
+              isPoinManual: false,
+              keterangan: null, // Hapus keterangan SAKIT/HAID sebelumnya
+              waliAsuhId: ctx.session.user.id,
+            })
+            .where(eq(logAbsensi.id, existing.id));
+        } else {
+          // Jika statusnya HADIR, IZIN, ALFA, atau LAINNYA, lemparkan error
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: `Peserta didik atas nama ${peserta.namaLengkap} sudah tercatat dengan status ${existing.statusKehadiran} pada sesi ini.`,
+          });
+        }
+      } else {
+        // 7. Simpan log baru
+        await ctx.db.insert(logAbsensi).values({
+          pesertaDidikId: peserta.id,
+          sesiId: sesi.id,
+          pelanggaranId: null,
+          waliAsuhId: ctx.session.user.id,
+          tanggal: tanggalFormat,
+          waktuScan: nowUtc,
+          statusKehadiran: "HADIR",
+          statusWaktu,
+          poinDidapat: poin,
+          isPoinManual: false,
         });
-
-      // 7. Simpan log
-      await ctx.db.insert(logAbsensi).values({
-        pesertaDidikId: peserta.id,
-        sesiId: sesi.id,
-        pelanggaranId: null,
-        waliAsuhId: ctx.session.user.id,
-        tanggal: tanggalFormat,
-        waktuScan: nowUtc, // Tetap simpan UTC di database
-        statusKehadiran: "HADIR",
-        statusWaktu,
-        poinDidapat: poin,
-        isPoinManual: false,
-      });
+      }
 
       return {
         id: peserta.id,
