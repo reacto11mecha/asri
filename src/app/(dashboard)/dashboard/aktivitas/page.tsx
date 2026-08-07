@@ -42,7 +42,17 @@ function getStatusBadge(log: LogEntry) {
       </Badge>
     );
   }
+
   switch (log.statusKehadiran) {
+    case "HAID":
+      return (
+        <Badge
+          variant="outline"
+          className="border-pink-300 bg-pink-50 text-pink-600"
+        >
+          HAID
+        </Badge>
+      );
     case "IZIN":
       return (
         <Badge
@@ -352,6 +362,7 @@ export default function AktivitasPage() {
                   <SelectItem value="SEMUA">Semua</SelectItem>
                   <SelectItem value="HADIR">Hadir</SelectItem>
                   <SelectItem value="IZIN">Izin</SelectItem>
+                  <SelectItem value="HAID">Haid</SelectItem>
                   <SelectItem value="SAKIT">Sakit</SelectItem>
                   <SelectItem value="ALFA">Alfa</SelectItem>
                   <SelectItem value="LAINNYA">Lainnya</SelectItem>
