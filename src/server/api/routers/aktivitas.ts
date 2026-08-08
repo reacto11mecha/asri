@@ -21,11 +21,17 @@ import {
   kelas,
   user,
 } from "~/server/db/schema";
-import { format, subDays, getHours } from "date-fns";
+import {
+  format,
+  subDays,
+  getHours,
+  differenceInDays,
+  parseISO,
+} from "date-fns";
 import { TRPCError } from "@trpc/server";
 import type { ScanResult } from "~/types/scan";
+import type { DBType } from "~/server/db";
 
-// Enum untuk opsi filter
 const statusKehadiranEnum = z.enum([
   "HADIR",
   "TIDAK_HADIR",
@@ -37,6 +43,258 @@ const statusKehadiranEnum = z.enum([
 ]);
 
 const tipeLogEnum = z.enum(["SESI", "PELANGGARAN"]);
+
+type PesertaWithKelas = {
+  id: string;
+  namaLengkap: string;
+  jenisKelamin: string | null;
+  agama:
+    | "ISLAM"
+    | "KRISTEN"
+    | "KATOLIK"
+    | "HINDU"
+    | "BUDHA"
+    | "KONGHUCU"
+    | "LAINNYA";
+  kelas: {
+    jenjang: "SD" | "SMP" | "SMA";
+    tingkat: string;
+    namaKelas: string;
+  };
+};
+
+async function prosesLogikaScan(
+  db: DBType, // Menggunakan any atau type DB Drizzle Anda
+  waliAsuhId: string,
+  peserta: PesertaWithKelas,
+  sesiId: string | undefined,
+  tipeScan: "SESI" | "HAID",
+  timeZone: string,
+): Promise<ScanResult> {
+  // 1. Kalkulasi Waktu & Tanggal Bisnis (Lokal)
+  const nowUtc = new Date();
+  const localTime = new Date(nowUtc.toLocaleString("en-US", { timeZone }));
+
+  const currentTimeString = format(localTime, "HH:mm:ss");
+  let businessDate = localTime;
+  if (getHours(localTime) < 3) {
+    businessDate = subDays(localTime, 1);
+  }
+  const tanggalFormat = format(businessDate, "yyyy-MM-dd");
+
+  // ==========================================
+  // LOGIKA A: MODE SCAN HAID (BULK INSERT)
+  // ==========================================
+  if (tipeScan === "HAID") {
+    if (peserta.jenisKelamin === "L") {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Sistem menolak: Laki-laki tidak bisa dilaporkan Haid.",
+      });
+    }
+
+    const recentHaidLogs = await db.query.logAbsensi.findMany({
+      where: and(
+        eq(logAbsensi.pesertaDidikId, peserta.id),
+        eq(logAbsensi.statusKehadiran, "HAID"),
+      ),
+      orderBy: [desc(logAbsensi.tanggal)],
+      limit: 50,
+    });
+
+    const uniqueDates = Array.from(
+      new Set(recentHaidLogs.map((l) => l.tanggal)),
+    );
+    let hariKe = 1;
+
+    if (uniqueDates.length > 0) {
+      const todayParsed = parseISO(tanggalFormat);
+      const mostRecentParsed = parseISO(uniqueDates[0] as string);
+      const gapToLast = differenceInDays(todayParsed, mostRecentParsed);
+
+      if (gapToLast >= 15) {
+        hariKe = 1; // Siklus baru
+      } else if (gapToLast >= 0) {
+        let startDateParsed = mostRecentParsed;
+
+        for (let i = 0; i < uniqueDates.length - 1; i++) {
+          const currentD = parseISO(uniqueDates[i] as string);
+          const prevD = parseISO(uniqueDates[i + 1] as string);
+
+          if (differenceInDays(currentD, prevD) < 15) {
+            startDateParsed = prevD;
+          } else {
+            break;
+          }
+        }
+
+        hariKe = differenceInDays(todayParsed, startDateParsed) + 1;
+
+        if (hariKe > 15) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message:
+              "Gagal: Telah melewati batas maksimal haid (15 hari). Darah dihukumi sebagai Istihadhah, wajib mengikuti kegiatan.",
+          });
+        }
+      }
+    }
+    const keteranganHaid = `Sedang Haid (Hari ke-${hariKe})`;
+
+    const sesiWajib = await db.query.sesiAbsensi.findMany({
+      where: and(
+        eq(sesiAbsensi.isActive, true),
+        eq(sesiAbsensi.isMandatory, true),
+        eq(sesiAbsensi.isHaidExempt, true),
+      ),
+    });
+
+    const targetSesi = sesiWajib.filter(
+      (s) =>
+        s.targetJenjang.includes(peserta.kelas.jenjang) &&
+        s.targetAgama.includes(peserta.agama),
+    );
+
+    if (targetSesi.length === 0) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message:
+          "Tidak ada jadwal kegiatan yang membebaskan Haid untuk profil anak ini di hari ini.",
+      });
+    }
+
+    await db.transaction(async (tx) => {
+      for (const sesi of targetSesi) {
+        await tx
+          .insert(logAbsensi)
+          .values({
+            pesertaDidikId: peserta.id,
+            sesiId: sesi.id,
+            waliAsuhId: waliAsuhId,
+            tanggal: tanggalFormat,
+            waktuScan: nowUtc,
+            statusKehadiran: "HAID",
+            poinDidapat: 0,
+            isPoinManual: false,
+            keterangan: keteranganHaid,
+          })
+          .onConflictDoNothing({
+            target: [
+              logAbsensi.tanggal,
+              logAbsensi.sesiId,
+              logAbsensi.pesertaDidikId,
+            ],
+          });
+      }
+    });
+
+    return {
+      id: peserta.id,
+      namaLengkap: peserta.namaLengkap,
+      kelas: {
+        tingkat: peserta.kelas.tingkat,
+        namaKelas: peserta.kelas.namaKelas,
+        jenjang: peserta.kelas.jenjang,
+      },
+    } satisfies ScanResult;
+  }
+
+  // ==========================================
+  // LOGIKA B: MODE SCAN SESI RUTIN (NORMAL)
+  // ==========================================
+  if (!sesiId) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Sesi ID wajib dikirim untuk absensi rutin.",
+    });
+  }
+
+  const sesi = await db.query.sesiAbsensi.findFirst({
+    where: eq(sesiAbsensi.id, sesiId),
+  });
+
+  if (!sesi)
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Sesi tidak terdaftar.",
+    });
+  if (!sesi.isActive)
+    throw new TRPCError({ code: "BAD_REQUEST", message: "Sesi tidak aktif." });
+  if (!sesi.targetJenjang.includes(peserta.kelas.jenjang))
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Jenjang tidak sesuai.",
+    });
+  if (!sesi.targetAgama.includes(peserta.agama))
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Agama tidak sesuai.",
+    });
+
+  let statusWaktu: "TEPAT_WAKTU" | "TELAT" = "TEPAT_WAKTU";
+  let poin = sesi.poinTepatWaktu;
+
+  if (
+    sesi.isLateEnabled &&
+    sesi.waktuSelesai &&
+    currentTimeString > sesi.waktuSelesai
+  ) {
+    statusWaktu = "TELAT";
+    poin = sesi.poinTelat;
+  }
+
+  const existing = await db.query.logAbsensi.findFirst({
+    where: and(
+      eq(logAbsensi.pesertaDidikId, peserta.id),
+      eq(logAbsensi.sesiId, sesi.id),
+      eq(logAbsensi.tanggal, tanggalFormat),
+    ),
+  });
+
+  if (existing) {
+    if (["SAKIT", "HAID"].includes(existing.statusKehadiran)) {
+      await db
+        .update(logAbsensi)
+        .set({
+          waktuScan: nowUtc,
+          statusKehadiran: "HADIR",
+          statusWaktu: statusWaktu,
+          poinDidapat: poin,
+          isPoinManual: false,
+          keterangan: null,
+          waliAsuhId: waliAsuhId,
+        })
+        .where(eq(logAbsensi.id, existing.id));
+    } else {
+      throw new TRPCError({
+        code: "CONFLICT",
+        message: `Peserta didik ${peserta.namaLengkap} sudah tercatat ${existing.statusKehadiran.replace("_", " ")}.`,
+      });
+    }
+  } else {
+    await db.insert(logAbsensi).values({
+      pesertaDidikId: peserta.id,
+      sesiId: sesi.id,
+      waliAsuhId: waliAsuhId,
+      tanggal: tanggalFormat,
+      waktuScan: nowUtc,
+      statusKehadiran: "HADIR",
+      statusWaktu,
+      poinDidapat: poin,
+      isPoinManual: false,
+    });
+  }
+
+  return {
+    id: peserta.id,
+    namaLengkap: peserta.namaLengkap,
+    kelas: {
+      tingkat: peserta.kelas.tingkat,
+      namaKelas: peserta.kelas.namaKelas,
+      jenjang: peserta.kelas.jenjang,
+    },
+  } satisfies ScanResult;
+}
 
 export const aktivitasRouter = createTRPCRouter({
   // --------------------------------------------------------
@@ -299,7 +557,73 @@ export const aktivitasRouter = createTRPCRouter({
               "Laki-laki tidak bisa haid. Mungkin anda salah peserta didik.",
           });
 
-        // 1. Cari semua sesi wajib yang cocok dengan profil anak
+        // 1. PENENTUAN KETERANGAN OTOMATIS OLEH SISTEM
+        let finalKeterangan = input.keterangan || "";
+
+        if (input.statusKehadiran === "SAKIT") {
+          const baseDesc = "Sakit";
+          finalKeterangan = input.keterangan
+            ? `${baseDesc} - ${input.keterangan}`
+            : baseDesc;
+        } else if (input.statusKehadiran === "HAID") {
+          // Cari riwayat haid sebelum atau sama dengan tanggal input
+          const recentHaidLogs = await ctx.db.query.logAbsensi.findMany({
+            where: and(
+              eq(logAbsensi.pesertaDidikId, peserta.id),
+              eq(logAbsensi.statusKehadiran, "HAID"),
+              lte(logAbsensi.tanggal, input.tanggal),
+            ),
+            orderBy: [desc(logAbsensi.tanggal)],
+            limit: 50,
+          });
+
+          const uniqueDates = Array.from(
+            new Set(recentHaidLogs.map((l) => l.tanggal)),
+          );
+          let hariKe = 1;
+
+          if (uniqueDates.length > 0) {
+            const inputDateParsed = parseISO(input.tanggal);
+            const mostRecentParsed = parseISO(uniqueDates[0] as string);
+            const gapToLast = differenceInDays(
+              inputDateParsed,
+              mostRecentParsed,
+            );
+
+            if (gapToLast >= 15) {
+              hariKe = 1; // Siklus baru
+            } else if (gapToLast >= 0) {
+              let startDateParsed = mostRecentParsed;
+              for (let i = 0; i < uniqueDates.length - 1; i++) {
+                const currentD = parseISO(uniqueDates[i] as string);
+                const prevD = parseISO(uniqueDates[i + 1] as string);
+
+                if (differenceInDays(currentD, prevD) < 15) {
+                  startDateParsed = prevD;
+                } else {
+                  break;
+                }
+              }
+
+              hariKe = differenceInDays(inputDateParsed, startDateParsed) + 1;
+
+              if (hariKe > 15) {
+                throw new TRPCError({
+                  code: "FORBIDDEN",
+                  message:
+                    "Gagal: Telah melewati batas maksimal haid (15 hari). Darah dihukumi sebagai Istihadhah.",
+                });
+              }
+            }
+          }
+
+          const baseDesc = `Sedang Haid (Hari ke-${hariKe})`;
+          finalKeterangan = input.keterangan
+            ? `${baseDesc} - ${input.keterangan}`
+            : baseDesc;
+        }
+
+        // 2. Cari semua sesi wajib yang cocok dengan profil anak
         const sesiWajib = await ctx.db.query.sesiAbsensi.findMany({
           where: and(
             eq(sesiAbsensi.isActive, true),
@@ -307,7 +631,6 @@ export const aktivitasRouter = createTRPCRouter({
           ),
         });
 
-        // Filter manual jika query SQL raw di atas sulit
         let targetSesi = sesiWajib
           .filter((s) => s.targetJenjang.includes(peserta.kelas.jenjang))
           .filter((s) => s.targetAgama.includes(peserta.agama));
@@ -322,7 +645,7 @@ export const aktivitasRouter = createTRPCRouter({
             message: "Tidak ada jadwal sesi wajib untuk anak ini.",
           });
 
-        // 2. Insert semua sesi kegiatan yang valid
+        // 3. Insert semua sesi kegiatan yang valid
         await ctx.db.transaction(async (tx) => {
           for (const sesi of targetSesi) {
             await tx
@@ -336,13 +659,10 @@ export const aktivitasRouter = createTRPCRouter({
                 statusKehadiran: input.statusKehadiran,
                 statusWaktu: null,
                 poinDidapat: 0,
-                isPoinManual: false,
-                keterangan: input.keterangan,
+                isPoinManual: true, // Tercatat True karena dieksekusi dari form manual
+                keterangan: finalKeterangan, // <--- Menggunakan keterangan yang di-generate sistem
               })
               .onConflictDoNothing({
-                // Syarat #3 Anda: "Belum ada catatannya pada tanggal yang dimaksud"
-                // Dengan DoNothing, jika sudah ada absen (misal subuh dia hadir),
-                // data subuh tidak akan tertimpa oleh status SAKIT ini.
                 target: [
                   logAbsensi.tanggal,
                   logAbsensi.sesiId,
@@ -487,12 +807,12 @@ export const aktivitasRouter = createTRPCRouter({
     .input(
       z.object({
         nipd: z.string(),
-        sesiId: z.string(),
+        sesiId: z.string().optional(),
+        tipeScan: z.enum(["SESI", "HAID"]).default("SESI"),
         timeZone: z.string().default("Asia/Jakarta"),
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      // 1. Cari Siswa
       const peserta = await ctx.db.query.pesertaDidik.findFirst({
         where: eq(pesertaDidik.nipd, input.nipd),
         with: { kelas: true },
@@ -505,254 +825,48 @@ export const aktivitasRouter = createTRPCRouter({
         });
       }
 
-      // 2. Cari Sesi
-      const sesi = await ctx.db.query.sesiAbsensi.findFirst({
-        where: eq(sesiAbsensi.id, input.sesiId),
-      });
-
-      if (!sesi)
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Sesi tidak terdaftar pada sistem.",
-        });
-
-      if (!sesi.isActive)
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Sesi ini tidak aktif.",
-        });
-
-      // 3. Validasi Target Jenjang & Agama Sesi
-      const isTargetedJenjang = sesi.targetJenjang.includes(
-        peserta.kelas.jenjang,
+      return await prosesLogikaScan(
+        ctx.db,
+        ctx.session.user.id,
+        peserta,
+        input.sesiId,
+        input.tipeScan,
+        input.timeZone,
       );
-      if (!isTargetedJenjang) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: `Siswa jenjang ${peserta.kelas.jenjang} tidak ditugaskan untuk sesi ini.`,
-        });
-      }
-
-      const isTargetedAgama = sesi.targetAgama.includes(peserta.agama);
-      if (!isTargetedAgama) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: `Sesi ini tidak diperuntukkan bagi peserta didik beragama ${peserta.agama}.`,
-        });
-      }
-
-      // 4. Kalkulasi Waktu (Tepat Waktu vs Telat)
-      const nowUtc = new Date();
-
-      const localTime = new Date(
-        nowUtc.toLocaleString("en-US", { timeZone: input.timeZone }),
-      );
-
-      const currentTimeString = format(localTime, "HH:mm:ss");
-
-      let statusWaktu: "TEPAT_WAKTU" | "TELAT" = "TEPAT_WAKTU";
-      let poin = sesi.poinTepatWaktu;
-
-      if (
-        sesi.isLateEnabled &&
-        sesi.waktuSelesai &&
-        currentTimeString > sesi.waktuSelesai
-      ) {
-        statusWaktu = "TELAT";
-        poin = sesi.poinTelat;
-      }
-
-      // 5. Penanganan Tanggal Crossover (Tengah Malam)
-      let businessDate = localTime;
-      if (getHours(localTime) < 3) {
-        businessDate = subDays(localTime, 1);
-      }
-
-      const tanggalFormat = format(businessDate, "yyyy-MM-dd");
-
-      // 6. Cek Duplikasi atau Overwrite Data
-      const existing = await ctx.db.query.logAbsensi.findFirst({
-        where: and(
-          eq(logAbsensi.pesertaDidikId, peserta.id),
-          eq(logAbsensi.sesiId, sesi.id),
-          eq(logAbsensi.tanggal, tanggalFormat),
-        ),
-      });
-
-      if (existing) {
-        // HANYA overwrite jika statusnya SAKIT atau HAID
-        if (["SAKIT", "HAID"].includes(existing.statusKehadiran)) {
-          await ctx.db
-            .update(logAbsensi)
-            .set({
-              waktuScan: nowUtc,
-              statusKehadiran: "HADIR",
-              statusWaktu: statusWaktu,
-              poinDidapat: poin,
-              isPoinManual: false,
-              keterangan: null, // Hapus keterangan SAKIT/HAID sebelumnya
-              waliAsuhId: ctx.session.user.id,
-            })
-            .where(eq(logAbsensi.id, existing.id));
-        } else {
-          // Jika statusnya HADIR, IZIN, ALFA, atau LAINNYA, lemparkan error
-          throw new TRPCError({
-            code: "CONFLICT",
-            message: `Peserta didik atas nama ${peserta.namaLengkap} sudah tercatat dengan status ${existing.statusKehadiran} pada sesi ini.`,
-          });
-        }
-      } else {
-        // 7. Simpan log baru
-        await ctx.db.insert(logAbsensi).values({
-          pesertaDidikId: peserta.id,
-          sesiId: sesi.id,
-          pelanggaranId: null,
-          waliAsuhId: ctx.session.user.id,
-          tanggal: tanggalFormat,
-          waktuScan: nowUtc,
-          statusKehadiran: "HADIR",
-          statusWaktu,
-          poinDidapat: poin,
-          isPoinManual: false,
-        });
-      }
-
-      return peserta;
     }),
 
+  // --------------------------------------------------------
+  // 6. SCAN RFID
+  // --------------------------------------------------------
   scanRfid: protectedProcedure
     .input(
       z.object({
         uidKartu: z.string().length(8),
-        sesiId: z.string(),
+        sesiId: z.string().optional(),
+        tipeScan: z.enum(["SESI", "HAID"]).default("SESI"),
         timeZone: z.string().default("Asia/Jakarta"),
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      // 1. Cari siswa berdasarkan uidKartu
       const peserta = await ctx.db.query.pesertaDidik.findFirst({
         where: eq(pesertaDidik.uidKartu, input.uidKartu.toUpperCase()),
         with: { kelas: true },
       });
-      if (!peserta)
+
+      if (!peserta) {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Kartu tidak dikenali / belum terdaftar.",
         });
+      }
 
-      // 2. Cari sesi
-      const sesi = await ctx.db.query.sesiAbsensi.findFirst({
-        where: eq(sesiAbsensi.id, input.sesiId),
-      });
-
-      if (!sesi)
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Sesi tidak terdaftar pada sistem.",
-        });
-
-      if (!sesi.isActive)
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Sesi ini tidak aktif.",
-        });
-
-      // 3. Validasi target jenjang & agama
-      if (!sesi.targetJenjang.includes(peserta.kelas.jenjang))
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: `Siswa jenjang ${peserta.kelas.jenjang} tidak ditugaskan pada sesi ini.`,
-        });
-
-      if (!sesi.targetAgama.includes(peserta.agama))
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: `Sesi ini tidak diperuntukkan bagi peserta beragama ${peserta.agama}.`,
-        });
-
-      // 4. Kalkulasi Waktu Lokal berdasarkan timeZone perangkat
-      const nowUtc = new Date();
-      const localTime = new Date(
-        nowUtc.toLocaleString("en-US", { timeZone: input.timeZone }),
+      return await prosesLogikaScan(
+        ctx.db,
+        ctx.session.user.id,
+        peserta,
+        input.sesiId,
+        input.tipeScan,
+        input.timeZone,
       );
-
-      const currentTimeString = format(localTime, "HH:mm:ss");
-
-      let statusWaktu: "TEPAT_WAKTU" | "TELAT" = "TEPAT_WAKTU";
-      let poin = sesi.poinTepatWaktu;
-
-      if (
-        sesi.isLateEnabled &&
-        sesi.waktuSelesai &&
-        currentTimeString > sesi.waktuSelesai
-      ) {
-        statusWaktu = "TELAT";
-        poin = sesi.poinTelat;
-      }
-
-      // 5. Tanggal Bisnis (Midnight Crossover)
-      let businessDate = localTime;
-      if (getHours(localTime) < 3) {
-        businessDate = subDays(localTime, 1);
-      }
-
-      const tanggalFormat = format(businessDate, "yyyy-MM-dd");
-
-      // 6. Cek duplikasi atau Overwrite Data
-      const existing = await ctx.db.query.logAbsensi.findFirst({
-        where: and(
-          eq(logAbsensi.pesertaDidikId, peserta.id),
-          eq(logAbsensi.sesiId, sesi.id),
-          eq(logAbsensi.tanggal, tanggalFormat),
-        ),
-      });
-
-      if (existing) {
-        // HANYA overwrite jika statusnya SAKIT atau HAID
-        if (["SAKIT", "HAID"].includes(existing.statusKehadiran)) {
-          await ctx.db
-            .update(logAbsensi)
-            .set({
-              waktuScan: nowUtc,
-              statusKehadiran: "HADIR",
-              statusWaktu: statusWaktu,
-              poinDidapat: poin,
-              isPoinManual: false,
-              keterangan: null, // Hapus keterangan SAKIT/HAID sebelumnya
-              waliAsuhId: ctx.session.user.id,
-            })
-            .where(eq(logAbsensi.id, existing.id));
-        } else {
-          // Jika statusnya HADIR, IZIN, ALFA, atau LAINNYA, lemparkan error
-          throw new TRPCError({
-            code: "CONFLICT",
-            message: `Peserta didik atas nama ${peserta.namaLengkap} sudah tercatat dengan status ${existing.statusKehadiran} pada sesi ini.`,
-          });
-        }
-      } else {
-        // 7. Simpan log baru
-        await ctx.db.insert(logAbsensi).values({
-          pesertaDidikId: peserta.id,
-          sesiId: sesi.id,
-          pelanggaranId: null,
-          waliAsuhId: ctx.session.user.id,
-          tanggal: tanggalFormat,
-          waktuScan: nowUtc,
-          statusKehadiran: "HADIR",
-          statusWaktu,
-          poinDidapat: poin,
-          isPoinManual: false,
-        });
-      }
-
-      return {
-        id: peserta.id,
-        namaLengkap: peserta.namaLengkap,
-        kelas: {
-          tingkat: peserta.kelas.tingkat,
-          namaKelas: peserta.kelas.namaKelas,
-          jenjang: peserta.kelas.jenjang,
-        },
-      } satisfies ScanResult;
     }),
 });

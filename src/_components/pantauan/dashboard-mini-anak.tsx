@@ -29,16 +29,23 @@ export default function DasborMiniAnak({ onLogout }: DasborMiniAnakProps) {
 
   // Fungsi utilitas untuk memberikan warna badge berdasarkan status kehadiran
   const getStatusColor = (status: string, waktu?: string | null) => {
-    if (status === "HADIR") {
-      return waktu === "TELAT"
-        ? "bg-amber-100 text-amber-800 border-amber-200"
-        : "bg-emerald-100 text-emerald-800 border-emerald-200";
+    switch (status) {
+      case "HADIR": {
+        return waktu === "TELAT"
+          ? "bg-amber-100 text-amber-800 border-amber-200"
+          : "bg-emerald-100 text-emerald-800 border-emerald-200";
+      }
+      case "HAID":
+        return "border-pink-300 bg-pink-50 text-pink-600";
+      case "IZIN":
+      case "SAKIT":
+        return "bg-blue-100 text-blue-800 border-blue-200";
+      case "ALFA":
+      case "TIDAK_HADIR":
+        return "bg-red-100 text-red-800 border-red-200";
+      default:
+        return "bg-gray-100 text-gray-800 border-gray-200";
     }
-    if (status === "IZIN" || status === "SAKIT")
-      return "bg-blue-100 text-blue-800 border-blue-200";
-    if (status === "ALFA" || status === "TIDAK_HADIR")
-      return "bg-red-100 text-red-800 border-red-200";
-    return "bg-gray-100 text-gray-800 border-gray-200";
   };
 
   // Fungsi utilitas untuk merapikan teks status

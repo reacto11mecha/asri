@@ -1,27 +1,15 @@
 // src/app/(nondashboard)/rfid/page.tsx
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "~/trpc/react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
-import { Input } from "~/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectSeparator,
-  SelectTrigger,
-  SelectValue,
-} from "~/components/ui/select";
 import {
   ArrowLeft,
   CheckCircle2,
   AlertCircle,
-  Search,
   Radio,
   Wrench,
 } from "lucide-react";
@@ -30,84 +18,23 @@ import { useRfidScanner } from "~/hooks/useRfidScanner";
 import { useNativeMessage } from "~/hooks/useNativeMessage";
 import type { ScanResult } from "~/types/scan";
 
-type SesiPilihan = {
-  id: string;
-  namaSesi: string;
-  waktuMulai: string | null;
-  waktuSelesai: string | null;
-  namaKategori: string;
-};
+import { useScannerSetup } from "~/hooks/use-scanner-setup";
+import { ScannerSetupForm } from "~/_components/scanner/setup-form";
 
 export default function RfidPage() {
   const router = useRouter();
   const utils = api.useUtils();
-
   const { playSuccess, playError, prewarm } = useBeep();
-
   const [showDevTools, setShowDevTools] = useState(false);
   const [isConfigured, setIsConfigured] = useState(false);
-  const [sesiId, setSesiId] = useState<string>("");
+
+  const setup = useScannerSetup();
+
   const [scanStatus, setScanStatus] = useState<"idle" | "success" | "error">(
     "idle",
   );
   const [scanData, setScanData] = useState<ScanResult | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
-  const [searchSesi, setSearchSesi] = useState("");
-
-  const { data: options, isLoading } = api.aktivitas.getFormOptions.useQuery();
-
-  const groupedSesi = useMemo(() => {
-    if (!options?.kategori) return [];
-    const now = new Date();
-    const currentMinutes = now.getHours() * 60 + now.getMinutes();
-
-    return options.kategori
-      .map((k) => ({
-        kategoriId: k.id,
-        namaKategori: k.namaKategori,
-        sesi: k.sesi.filter((s) => {
-          if (!s.isActive) return false;
-
-          if (!s.waktuMulai || !s.waktuSelesai) {
-            if (!searchSesi) return true;
-            const keyword = searchSesi.toLowerCase();
-            return (
-              s.namaSesi.toLowerCase().includes(keyword) ||
-              k.namaKategori.toLowerCase().includes(keyword)
-            );
-          }
-
-          const [startH = 0, startM = 0] = s.waktuMulai.split(":").map(Number);
-          const [endH = 0, endM = 0] = s.waktuSelesai.split(":").map(Number);
-          if (isNaN(startH) || isNaN(startM) || isNaN(endH) || isNaN(endM))
-            return false;
-
-          const startMinutes = startH * 60 + startM;
-          const endMinutes = endH * 60 + endM;
-
-          if (currentMinutes < startMinutes - 30) return false;
-          if (currentMinutes > endMinutes + 15) return false;
-
-          if (!searchSesi) return true;
-          const keyword = searchSesi.toLowerCase();
-          return (
-            s.namaSesi.toLowerCase().includes(keyword) ||
-            k.namaKategori.toLowerCase().includes(keyword) ||
-            `${s.waktuMulai} ${s.waktuSelesai}`.includes(keyword)
-          );
-        }),
-      }))
-      .filter((g) => g.sesi.length > 0);
-  }, [options, searchSesi]);
-
-  const selectedSesi: SesiPilihan | null = useMemo(() => {
-    if (!sesiId) return null;
-    for (const g of groupedSesi) {
-      const found = g.sesi.find((s) => s.id === sesiId);
-      if (found) return { ...found, namaKategori: g.namaKategori };
-    }
-    return null;
-  }, [groupedSesi, sesiId]);
 
   const scanRfidMutation = api.aktivitas.scanRfid.useMutation({
     onSuccess: (data) => {
@@ -128,16 +55,18 @@ export default function RfidPage() {
   });
 
   const handleScan = (uid: string) => {
-    if (scanStatus !== "idle" || !sesiId) return;
-    scanRfidMutation.mutate({ uidKartu: uid.toUpperCase(), sesiId });
+    if (scanStatus !== "idle" || (!setup.sesiId && setup.tipeScan === "SESI"))
+      return;
+
+    scanRfidMutation.mutate({
+      uidKartu: uid.toUpperCase(),
+      sesiId: setup.tipeScan === "HAID" ? undefined : setup.sesiId, // Sesuaikan payload TRPC
+      tipeScan: setup.tipeScan,
+    });
   };
 
-  const simulateTap = (uid: string) => {
-    handleScan(uid);
-  };
-
+  const simulateTap = (uid: string) => handleScan(uid);
   useNativeMessage(handleScan);
-
   const { inputRef, handleInput } = useRfidScanner({
     onScan: handleScan,
     enabled: isConfigured && scanStatus === "idle",
@@ -147,110 +76,38 @@ export default function RfidPage() {
     setScanStatus("idle");
     setErrorMessage("");
   };
-
   const handleBackToSetup = () => {
     setIsConfigured(false);
-    setSearchSesi("");
+    setup.resetSetup();
   };
 
-  // ====================== SETUP VIEW ======================
   if (!isConfigured) {
     return (
       <div className="bg-muted/30 flex min-h-screen items-center justify-center p-4 sm:p-6">
-        <Card className="w-full max-w-md shadow-lg md:max-w-lg">
-          <CardContent className="flex flex-col gap-8 p-4 sm:p-8">
+        <Card className="border-t-primary w-full max-w-md border-t-4 shadow-lg md:max-w-lg">
+          <CardContent className="flex flex-col gap-6 p-4 sm:p-8">
             <div>
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => router.push("/dashboard/aktivitas")}
-                className="text-muted-foreground hover:text-foreground mb-6 -ml-3"
+                onClick={() => router.push("/dashboard")}
+                className="text-muted-foreground hover:text-foreground mb-4 -ml-3"
               >
                 <ArrowLeft className="mr-2 h-4 w-4" /> Kembali ke Dashboard
               </Button>
-              <h1 className="mb-2 text-2xl font-bold">Persiapan Tap RFID</h1>
+              <h1 className="mb-1 text-2xl font-bold">Persiapan Tap RFID</h1>
               <p className="text-muted-foreground text-sm leading-relaxed">
-                Pilih sesi kegiatan sebelum menempelkan kartu.
+                Pilih mode dan sesi sebelum menempelkan kartu.
               </p>
             </div>
-
-            {isLoading ? (
-              <p className="text-muted-foreground animate-pulse py-8 text-center">
-                Memuat opsi kegiatan...
-              </p>
-            ) : (
-              <div className="flex flex-col gap-6">
-                <div className="flex flex-col gap-3">
-                  <label className="text-sm font-semibold">Sesi Kegiatan</label>
-                  <Select
-                    value={sesiId}
-                    onValueChange={(val) => {
-                      if (val) setSesiId(val);
-                    }}
-                  >
-                    <SelectTrigger className="h-12 w-full">
-                      <SelectValue placeholder="Cari dan pilih sesi...">
-                        {selectedSesi
-                          ? `[${selectedSesi.namaKategori}] ${selectedSesi.namaSesi} (${selectedSesi.waktuMulai ?? ""} - ${selectedSesi.waktuSelesai ?? ""})`
-                          : undefined}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent className="max-h-[350px]">
-                      <div className="bg-popover sticky top-0 z-10 border-b p-2 shadow-sm">
-                        <div className="relative">
-                          <Search className="text-muted-foreground absolute top-2.5 left-2.5 h-4 w-4" />
-                          <Input
-                            placeholder="Cari sesi atau kategori..."
-                            value={searchSesi}
-                            onChange={(e) => setSearchSesi(e.target.value)}
-                            onKeyDown={(e) => e.stopPropagation()}
-                            className="h-9 pl-9"
-                          />
-                        </div>
-                      </div>
-                      {groupedSesi.length > 0 ? (
-                        groupedSesi.map((group) => (
-                          <div key={group.kategoriId}>
-                            <SelectGroup>
-                              <SelectLabel className="text-muted-foreground text-xs font-semibold">
-                                {group.namaKategori}
-                              </SelectLabel>
-                              {group.sesi.map((s) => (
-                                <SelectItem
-                                  key={s.id}
-                                  value={s.id}
-                                  className="py-3 pl-6"
-                                >
-                                  {s.namaSesi} ({s.waktuMulai} -{" "}
-                                  {s.waktuSelesai})
-                                </SelectItem>
-                              ))}
-                            </SelectGroup>
-                            <SelectSeparator />
-                          </div>
-                        ))
-                      ) : (
-                        <div className="text-muted-foreground py-6 text-center text-sm">
-                          Tidak ada sesi yang tersedia saat ini
-                          {searchSesi ? ` untuk pencarian "${searchSesi}"` : ""}
-                        </div>
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <Button
-                  className="h-12 w-full text-base font-semibold"
-                  disabled={!sesiId}
-                  onClick={() => {
-                    setIsConfigured(true);
-                    prewarm();
-                  }}
-                >
-                  Mulai Tap RFID
-                </Button>
-              </div>
-            )}
+            <ScannerSetupForm
+              setup={setup}
+              onStart={() => {
+                setIsConfigured(true);
+                prewarm();
+              }}
+              buttonText="Mulai Tap RFID"
+            />
           </CardContent>
         </Card>
       </div>
@@ -309,19 +166,24 @@ export default function RfidPage() {
           )}
         </div>
       )}
+
       <div className="flex w-full flex-wrap items-center justify-between gap-2 px-2 pt-4 text-white">
         <Button
           variant="ghost"
           className="text-white hover:bg-white/20 hover:text-white"
           onClick={handleBackToSetup}
         >
-          <ArrowLeft className="mr-2 h-5 w-5" /> Ganti Sesi
+          <ArrowLeft className="mr-2 h-5 w-5" /> Pengaturan
         </Button>
         <div className="text-right">
-          <p className="text-lg font-bold">
-            {selectedSesi
-              ? `${selectedSesi.namaKategori} - ${selectedSesi.namaSesi}`
-              : ""}
+          <p
+            className={`text-lg font-bold ${setup.tipeScan === "HAID" ? "text-pink-400" : ""}`}
+          >
+            {setup.tipeScan === "HAID"
+              ? "Pelaporan Haid Massal"
+              : setup.selectedSesi
+                ? `${setup.selectedSesi.namaKategori} - ${setup.selectedSesi.namaSesi}`
+                : ""}
           </p>
           <p className="text-sm text-green-400 opacity-80">
             Tempelkan kartu...
@@ -393,7 +255,7 @@ export default function RfidPage() {
 
       <div className="mt-8 px-6 text-center text-white">
         <p className="text-base font-medium tracking-wide opacity-90">
-          Tempelkan kartu RFID/NFC ke pembaca.
+          Tempelkan kartu RFID ke pembaca.
         </p>
         <p className="mt-2 text-sm opacity-50">
           UID kartu akan otomatis terbaca.
